@@ -19,6 +19,7 @@ program SVMC
 
   use readpara_mod       ! module for reading parameter files in ASCII
   use readclim_mod       ! module for reading reading meteorological forcing data
+  use netcdf             ! library for processing netcdf files
   use readsoil_mod       ! module for reading soil properties (shared with yasso?)
   use phydro_mod         ! module for p-hydro
   use alloc_mod          ! module for carbon allocation and yield
