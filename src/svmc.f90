@@ -17,27 +17,42 @@
 
 program SVMC
 
+  use netcdf             ! library for processing netcdf files
   use readpara_mod       ! module for reading parameter files in ASCII
   use readclim_mod       ! module for reading reading meteorological forcing data
-  use netcdf             ! library for processing netcdf files
   use readsoil_mod       ! module for reading soil properties (shared with yasso?)
   use phydro_mod         ! module for p-hydro
   use alloc_mod          ! module for carbon allocation and yield
-  !use yasso20
-  !use soilwater_mod
+  !use yasso20           ! placeholder for soil decomposition model, which will provide hr   
+  !use soilwater_mod     ! placeholder for soil water bucket model, which will provide psi_soil for p-hydro
 
   implicit none
 
   !Loop variables
   !***********************************
   integer   :: i, j, k, t
-  real     ::    
+
   !***********************************
 
   !Model variables
   !***********************************
   integer   ::
-  real     ::    
+
+  ! Input variables for p-hydro (the definition is from rpmodel.R)
+  real     ::    tc        ! Air temperature (tc), degrees C
+  real     ::    ppfd      ! Photosynthetic photon flux density (mol m-2 d-1) (incoming solar radiation from forcing data?)
+  real     ::    vpd       ! Vapour pressure deficit (Pa) (will be calculated using pressure & humidity)
+  real     ::    co2       ! Atmospheric CO2 concentration (ppm)
+  real     ::    elv       ! Elevation above sea-level (m.a.s.l.) (not needed if we have surface pressure!)
+  real     ::    fapar     ! Fraction of absorbed photosynthetically active radiation (unitless) (will be calculated using LAI)
+  real     ::    kphio     ! Apparent quantum yield efficiency (unitless).
+  real     ::    psi_soil  ! soil water potential (Mpa)
+  real     ::    rdark = 0 !
+  real     ::    par_plant !  A list of plant hydraulic parameters (will be defined in readpara_mod.f90)
+  real     ::   par_cost = NULL  ! A list of cost parameters
+  character(len=200)  :: opt_hypothesis=''   ! character, Either "Lc" or "PM"
+
+
   character(len=200)  ::
   real,dimension(:,:), allocatable
   logical,dimension(:,:), allocatable ::
