@@ -14,6 +14,24 @@ MODULE phydro_mod
   !Public member functions:
   public :: pmodel_hydraulics_numerical   ! p-hydro module
 
+  type, public :: par_env_type
+    real(r8) :: viscosity_water     
+    real(r8) :: density_water             
+    real(r8) :: patm
+    real(r8) :: tc
+    real(r8) :: vpd                   
+  end type par_env_type
+
+  type, public :: par_photosynth_type
+    real(r8) :: kmm  
+    real(r8) :: gammastar             
+    real(r8) :: phi0
+    real(r8) :: Iabs
+    real(r8) :: ca  
+    real(r8) :: patm
+    real(r8) :: delta      
+  end par_photosynth_type
+
 contains
   
   !---------------------------------------------------------
@@ -38,7 +56,8 @@ contains
     real(r8)      , intent(in)    :: psi_soil  ! soil water potential (Mpa)
     real(r8)      , intent(in)    :: rdark = 0 ! Dark respiration \eqn{Rd} (mol C m-2)
     type(par_plant_type), intent(in)  :: par_plant           ! A list of plant hydraulic parameters (will be defined in readpara_mod.f90).
-    type(par_cost_type) , intent(in)  :: par_cost            ! A list of cost parameters (will be defined in readpara_mod.f90)..
+    type(par_cost_type) , intent(in)  :: par_cost            ! A list of cost parameters (will be defined in readpara_mod.f90).
+
     character(len=200)  , intent(in)  :: opt_hypothesis='PM'   ! character, Either "Lc" or "PM"
                                                              ! "Lc": Least Cost (see: rpmodel_hydraulics_numerical.R)
                                                              ! "PM": Profit Maximisation (see: rpmodel_hydraulics_numerical.R)
@@ -56,54 +75,48 @@ contains
     real(r8)      , intent(out)   :: chi_jmax_lim = 0      ! Analytical chi in the case of strong Jmax limitation
 
     ! ! Local variables 
-    real     ::    
-    real     ::    
+
+    type(par_env_type)            :: par_env_now           ! 
+    type(par_photosynth_type)     :: par_cost              ! 
+    type(par_plant_type)          :: par_plant_now         ! 
+    type(par_cost_type)           :: par_cost_now          !
+
+    real     ::    fn_profit
+    real     ::    lj_dps
     real     ::    
     real     ::    
     real     ::    
     real     ::   
     integer  :: i, j, k, t
   
-    call calc_kmm(tc, p, kmm)  !Why does this use std. atm pressure, and not p(z)?
-    
-    
-    par_photosynth_now <- list(
-    calc_kmm(tc, p, kmm)
-    gammastar = rpmodel::calc_gammastar(tc, p),
-    phi0 = kphio*rpmodel::calc_ftemp_kphio(tc),
-    Iabs = ppfd*fapar,
-    ca = co2*p*1e-6,  # Convert to partial pressure
-    patm = p,
-    delta = rdark
-    )
+    call calc_kmm(tc, p, par_photosynth_now%kmm)  !Why does this use std. atm pressure, and not p(z)?
+    par_photosynth_now%gammastar = gammastar(tc, sp)
+    par_photosynth_now%phi0 = kphio*ftemp_kphio(tc)
+    par_photosynth_now%Iabs = ppfd*fapar
+    par_photosynth_now%ca = co2*sp*1e-6             ! Convert to partial pressure
+    par_photosynth_now%patm = sp,
+    par_photosynth_now%delta = rdark
   
-    par_env_now = list(
-    viscosity_water = rpmodel::calc_viscosity_h2o(tc, p),  # Needs to be imported from rpmodel.R
-    density_water = rpmodel::calc_density_h2o(tc, p),  # Needs to be imported from rpmodel.R
-    patm = p,
-    tc = tc,
-    vpd = vpd
-    )
+    par_env_now%viscosity_water = viscosity_h2o(tc, sp)
+    par_env_now%density_water = density_h2o(tc, sp)
+    par_env_now%patm = sp
+    par_env_now%tc = tc
+    par_env_now%vpd = vpd
   
     par_plant_now = par_plant
+    par_cost_now = par_cost
+    
+    !! if par_cost is empty, use pre-defined parameter
+    !if (opt_hypothesis == "PM") then
+    !  par_cost_now%alpha = 0.1          ! cost of Jmax
+    !  par_cost_now%gamma = 1.0          ! cost of hydraulic repair
+    !else if (opt_hypothesis == "LC") then
+    !  par_cost_now%alpha = 0.1          ! cost of Jmax
+    !  par_cost_now%gamma = 0.5          ! cost of hydraulic repair
+    !end if
   
-    if (!is.null(par_cost)){
-      par_cost_now = par_cost
-    }
-    else{
-      if (opt_hypothesis == "PM"){
-        par_cost_now = list(
-        alpha = 0.1,       # cost of Jmax
-        gamma = 1          # cost of hydraulic repair
-      )
-    } else if (opt_hypothesis == "LC"){
-        par_cost_now = list(
-        alpha = .1,        # cost of Jmax
-        gamma = 0.5          # cost of hydraulic repair
-      )
-    }
-  }
-  
+     call optimise_midterm_multi(fn_profit, psi_soil, par_cost_now, par_photosynth_now, par_plant_now, par_env_now, opt_hypothesis)
+
   lj_dps = optimise_midterm_multi(fn_profit, psi_soil = psi_soil, par_cost  = par_cost_now, par_photosynth = par_photosynth_now, par_plant = par_plant_now, par_env = par_env_now, opt_hypothesis = opt_hypothesis)
   
   profit = fn_profit(par = lj_dps, psi_soil = psi_soil, par_cost  = par_cost_now, par_photosynth = par_photosynth_now, par_plant = par_plant_now, par_env = par_env_now, opt_hypothesis = opt_hypothesis)
@@ -134,12 +147,39 @@ contains
   END SUBROUTINE pmodel_hydraulics_numerical
 
 
-  calc_kmm <- function( tc, patm ) {
-  
+  SUBROUTINE optimise_midterm_multi(fn_profit, psi_soil, par_cost, par_photosynth, par_plant, par_env, return_all = FALSE, opt_hypothesis)
+    
 
+
+  END SUBROUTINE optimise_midterm_multi
+
+  optimise_midterm_multi <- function(){
   
-  return(kmm)
+  out_optim <- optimr::optimr(
+    par       = c(logjmax=0, dpsi=1),  
+    lower     = c(-10, .0001),
+    upper     = c(10, 1e6),
+    fn        = fn_profit,
+    psi_soil  = psi_soil,
+    par_cost  = par_cost,
+    par_photosynth = par_photosynth,
+    par_plant = par_plant,
+    par_env   = par_env,
+    do_optim  = TRUE,
+    opt_hypothesis = opt_hypothesis,
+    method    = "L-BFGS-B",
+    control   = list( maxit = 500, maximize = TRUE, fnscale=1e4 )
+  )
+  
+  out_optim$value <- -out_optim$value
+  
+  if (return_all){
+    out_optim
+  } else {
+    return(out_optim$par)
+  }
 }
+
 
   SUBROUTINE calc_kmm(tc, patm, kmm)
     !-------------------------------------------------------------------------
