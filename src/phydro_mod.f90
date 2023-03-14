@@ -68,15 +68,9 @@ contains
     
     
     par_photosynth_now <- list(
-<<<<<<< HEAD
-       kmm = rpmodel::calc_kmm(tc, p),  # Why does this use std. atm pressure, and not p(z)?
-       gammastar = rpmodel::calc_gammastar(tc, p),
-       phi0 = kphio*rpmodel::calc_ftemp_kphio(tc),
-=======
     calc_kmm(tc, p, kmm)
     gammastar = rpmodel::calc_gammastar(tc, p),
     phi0 = kphio*rpmodel::calc_ftemp_kphio(tc),
->>>>>>> origin/develop
     Iabs = ppfd*fapar,
     ca = co2*p*1e-6,  # Convert to partial pressure
     patm = p,
