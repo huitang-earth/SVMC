@@ -147,7 +147,7 @@ contains
   END SUBROUTINE pmodel_hydraulics_numerical
 
 
-  SUBROUTINE optimise_midterm_multi(fn_profit, psi_soil, par_cost, par_photosynth, par_plant, par_env, return_all = FALSE, opt_hypothesis)
+  SUBROUTINE optimise_midterm_multi(fn_profit, psi_soil, par_cost, par_photosynth, par_plant, par_env, return_all, opt_hypothesis)
     
 
 
