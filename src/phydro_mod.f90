@@ -131,15 +131,17 @@ contains
     ! optimization
     !? Replacing function "optimise_midterm_multi" in p-hydro with "setulb" in Fortran. Need more work!
     ! optimise_midterm_multi(fn_profit, psi_soil, par_cost, par_photosynth, par_plant, par_env, return_all = FALSE, opt_hypothesis)
-    call setulb(fn_profit, psi_soil, par_cost_now, par_photosynth_now, par_plant_now, par_env_now, opt_hypothesis)
-  
-    profit = fn_profit(par = lj_dps, psi_soil = psi_soil, par_cost  = par_cost_now, par_photosynth = par_photosynth_now, par_plant = par_plant_now, par_env = par_env_now, opt_hypothesis = opt_hypothesis)
+    
+    call optimise_midterm_multi(lj_dps, psi_soil, par_cost, par_photosynth, par_plant, par_env, return_all, opt_hypothesis)
+    
+    profit = fn_profit(par = lj_dps, psi_soil = psi_soil, par_cost  = par_cost_now, par_photosynth = par_photosynth_now,        &
+                        par_plant = par_plant_now, par_env = par_env_now, do_optim=.false., opt_hypothesis = opt_hypothesis)
   
     jmax = exp(lj_dps%logjmax)
     dpsi = lj_dps%dpsi
-  
+    
     gs = calc_gs(dpsi=dpsi, psi_soil=psi_soil, par_plant = par_plant_now, par_env = par_env_now)
-  
+    
     call alc_assim_light_limited(ci, aj, gs = gs, jmax = jmax, par_photosynth = par_photosynth_now)
     a = aj
     ci =ci
@@ -151,41 +153,128 @@ contains
 
   END SUBROUTINE pmodel_hydraulics_numerical
 
-
-
-  SUBROUTINE optimise_midterm_multi(fn_profit, psi_soil, par_cost, par_photosynth, par_plant, par_env, return_all, opt_hypothesis)
+  SUBROUTINE optimise_midterm_multi(lj_dps, psi_soil, par_cost, par_photosynth, par_plant, par_env, return_all, opt_hypothesis)
     
+    ! Want maximization, how should I do? -fn for max, fn for minimum
+
+
+    use bfgs
+
+
+    
+    real(optimizer_precision), dimension(:), allocatable :: wa(nwa)
+
+    implicit none
+
+    n=2       ! less than 1024
+    m=5       ! 15 for silam the higher the better...
+
+    x=(lj_dps%logjmax,lj_dps%dpsi)
+    ! alternatively: x=(logjmax=0, dpsi=1) ?
+    l=(-10, 0.0001)
+    u=(10, 1e6)
+    nbd=(2, 2)
+    profit=?
+    grad=(1.0e+7, 1.0e+7) ! for initialization
+    grad=gradient()     ! for other steps
+    factr=1.0e+7           ! From R: https://github.com/cran/lbfgsb3/blob/50faf23f4229a33de58f4d0c6ea36010abcb148d/R/lbfgsb3.R#L45
+    pgtol=1.0e-5           ! Similar to other models, e.g., R & SILAM 
+    nmax = 1024            ! related to n in the beginning
+    mmax = 17              ! related to m in the beginning
+    nwa=2*mmax*nmax + 5*nmax + 11*mmax*mmax + 8*mmax
+    !wa(nwa)=
+    iwa=3*nmax
+    task="START"
+    iprint=40   ! print a bit more than usual
+    icsave=0     ! just a place holder
+    lsave= (/True, Ture, Ture, True/)     ! 
+    isave(1:44)=0        !
+    dsave(1:29)=0.0      !
+    maxIterations=1000    ! The original model use 500, so 1000 should be fine.
+     
+    print *, "Before call, f=",f,"  task number ",itask," ")
+
+    do iter = 1, maxIterations
+      call setulb(n, m, x, l, u, nbd, profit, grad, factr, wa, iwa, task, iprint, icsave, lsave, isave, dsave)
+      
+     ! Print some basic informations about the optimization process 
+      print *, "lbfgsb3 parameter results:", x
+      print *, "task is ", task,
+      
+     ! Print
+      if (task(1:2) == 'FG') then
+        print *, "computing f and g at ", x
+        ! Compute function value f for the sample problem.
+        profit= fn_profit(par=x, psi_soil, par_cost_now, par_photosynth_now, par_plant_now, par_env_now, do_optim=.True., opt_hypothesis)
+        print *, "At iteration", isave(34), " f =", profit
+
+        ! Compute gradient g for the sample problem.
+        grad <- gradient(x, ...)
+        print *, "max(abs(g))=", max(abs(gad))
+
+      else if (task(1:5) == 'NEW_X') then
+        print *, "Continue"        !what is the meaning of "NEW_X"? 
+        continue
+      !If task is neither FG nor NEW_X we terminate execution.
+      else
+        exit    
+      end if 
+      
+    end do ! iter
 
 
   END SUBROUTINE optimise_midterm_multi
 
-  optimise_midterm_multi <- function(){
-  
-  out_optim <- optimr::optimr(
-    par       = c(logjmax=0, dpsi=1),  
-    lower     = c(-10, .0001),
-    upper     = c(10, 1e6),
-    fn        = fn_profit,
-    psi_soil  = psi_soil,
-    par_cost  = par_cost,
-    par_photosynth = par_photosynth,
-    par_plant = par_plant,
-    par_env   = par_env,
-    do_optim  = TRUE,
-    opt_hypothesis = opt_hypothesis,
-    method    = "L-BFGS-B",
-    control   = list( maxit = 500, maximize = TRUE, fnscale=1e4 )
-  )
-  
-  out_optim$value <- -out_optim$value
-  
-  if (return_all){
-    out_optim
-  } else {
-    return(out_optim$par)
-  }
-}
 
+  real(r8) FUNCTION gradient(x, psi_soil, par_photosynth, par_plant, par_env, par_cost)
+
+    !---------------------------------------------------------------
+    ! Calculates the patial derivative of profit fuction
+    ! According to functions in p-hydro: 
+    !     derivatives (For two-dimensional root-finding algorithm, see Sect. 1.3.2 in supplementary materials of Joshi et al. 2022 for details)
+    !     dFdx (For one-dimensional root-finding algorithm, see Sect. 1.3.2 in supplementary materials of Joshi et al. 2022 for details)
+    !---------------------------------------------------------------
+
+    ! !ARGUMENTS
+    real(r8), intent(in) :: tk                        ! Air temperature (Kelvin)
+    real(r8), intent(in) :: dha                       ! Activation energy (J mol-1)
+    real(r8), intent(in) :: tkref = 298.15            ! tkref Reference temperature (Kelvin)
+    
+    ! !LOCAL VARIABLES:
+    real(r8)             :: kR=8.3145                 ! Universal gas constant, J/mol/K
+  
+    
+    jmax = exp(x(1))   ! Jmax in umol/m2/s (logjmax is supplied by the optimizer)
+    dpsi = x(2)
+    
+    ! Two demensional root-finding (derivatives):
+    gs = calc_gs(dpsi, psi_soil, par_plant, par_env)      !* 1e6/par_photosynth$patm
+    call calc_assim_light_limited(ci, aj, gs, jmax, par_photosynth)
+    X=ci/par_photosynth%ca
+    gsprime = calc_gsprime(dpsi, psi_soil, par_plant, par_env)#* 1e6/par_photosynth$patm
+    J = calc_J(gs, X, par_photosynth)
+    ca = par_photosynth%ca/par_photosynth%patm*1e6
+    g = par_photosynth%gammastar/par_photosynth%ca 
+    gradient(1) = -gs*ca - par_cost$alpha * calc_djmax_dJ(ajmax, par_photosynth) * calc_dJ_dchi(gs, X, par_photosynth)
+    gradient(2) = gsprime*ca*(1-X) - par_cost$alpha * calc_djmax_dJ(ajmax, par_photosynth) * calc_dJ_ddpsi(gsprime, X, par_photosynth) - 2*par_cost$gamma*dpsi #/par_plant$psi50^2
+
+    ! One dimension root-finding (dFdx) 
+    gs = calc_gs(dpsi, psi_soil, par_plant, par_env)#* 1e6/par_photosynth$patm
+    gsprime = calc_gsprime(dpsi, psi_soil, par_plant, par_env)#* 1e6/par_photosynth$patm
+    X =  calc_x_from_dpsi(dpsi, psi_soil, par_plant, par_env, par_photosynth, par_cost)
+    J = calc_J(gs, X, par_photosynth)
+    ca = par_photosynth$ca/par_photosynth$patm*1e6
+    g = par_photosynth$gammastar/par_photosynth$ca
+  
+    djmax_dJ = calc_djmax_dJ(J, par_photosynth)
+    dJ_dchi = calc_dJ_dchi(gs, X, par_photosynth)
+    gradient(1) = -gs*ca - par_cost$alpha * djmax_dJ * dJ_dchi
+  
+    return
+  
+  END FUNCTION gradient
+
+  
 
   SUBROUTINE calc_kmm(tc, patm, kmm)
     !-------------------------------------------------------------------------
@@ -577,7 +666,6 @@ contains
     !vcmax_pot <- a*(ci + par$kmm)/(ci - par$gammastar)
   
   END SUBROUTINE calc_assim_light_limited
-
 
   real(r8) FUNCTION fn_profit(par, psi_soil, par_cost, par_photosynth, par_plant, par_env, do_optim, opt_hypothesis)
     !---------------------------------------------------------------
