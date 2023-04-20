@@ -151,6 +151,42 @@ contains
 
   END SUBROUTINE pmodel_hydraulics_numerical
 
+
+
+  SUBROUTINE optimise_midterm_multi(fn_profit, psi_soil, par_cost, par_photosynth, par_plant, par_env, return_all, opt_hypothesis)
+    
+
+
+  END SUBROUTINE optimise_midterm_multi
+
+  optimise_midterm_multi <- function(){
+  
+  out_optim <- optimr::optimr(
+    par       = c(logjmax=0, dpsi=1),  
+    lower     = c(-10, .0001),
+    upper     = c(10, 1e6),
+    fn        = fn_profit,
+    psi_soil  = psi_soil,
+    par_cost  = par_cost,
+    par_photosynth = par_photosynth,
+    par_plant = par_plant,
+    par_env   = par_env,
+    do_optim  = TRUE,
+    opt_hypothesis = opt_hypothesis,
+    method    = "L-BFGS-B",
+    control   = list( maxit = 500, maximize = TRUE, fnscale=1e4 )
+  )
+  
+  out_optim$value <- -out_optim$value
+  
+  if (return_all){
+    out_optim
+  } else {
+    return(out_optim$par)
+  }
+}
+
+
   SUBROUTINE calc_kmm(tc, patm, kmm)
     !-------------------------------------------------------------------------
     ! !DESCRIPTION:

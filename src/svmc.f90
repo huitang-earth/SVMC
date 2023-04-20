@@ -84,64 +84,89 @@ program SVMC
           call pmodel_input_prep()
           
           ! run phydro to estimate photosynthetic rate (a) and stomatal conductance (gs)
-          call pmodel_hydraulics_numerical(tc(t), ppfd(t), vpd(t), co2, sp(t), fapar(t), kphio, psi_soil(t), rdark = 0,  &
+          call pmodel_hydraulics_numerical(tc(t), ppfd(t), vpd(t), co2, sp(t), fapar(t), kphio, psi_soil(t-1), rdark = 0,  &
                                par_plant, par_cost = NULL, opt_hypothesis = "PM")
 
           ! Update gpp, npp, ar
           call carbon_allocation_hr(a,....)          
         
           ! Update transpiration, canopy evaporation...
-          call water_veg_flux(gs, .....)       
+          ! CanopyGrid in spafhy...
+          call canopy_water_flux(gs, tr, evap_can,.....)       
         
         end if
         
-        ! update soil water with the bucket model
-        call soilwater(gs or tr_veg, ...)                            !
-
-        ! update soil respiration, should we update soil respiration hourly or daily? 
-        call yasso20_hr(litter, soilwater,......) 
-
         ! Calculation of NEE & LATENT heat flux
         nee= gpp-ar-hr
-        et = tr_veg+evap_veg+evap_soil
+        et = tr+evap_can(temp, rad)+evap_soil(temp, rad)
 
         call write_output_hr()
         
         ! Comulative parts can be a separate module in the future
         ! Cumulative GPP or NPP which will be used for carbon allocation on daily or yearly scale. 
-        gpp_sum_year=gpp_sum_year + gpp_hr                   
-        npp_sum_year=npp_sum_year + gpp_hr
+        gpp_sum_day=gpp_sum_day + gpp_hr*3600*...           
+        npp_sum_day=npp_sum_day + npp_hr*3600*...
+        gpp_sum_year=gpp_sum_year + gpp_hr*3600*...                   
+        npp_sum_year=npp_sum_year + npp_hr*3600*...
           
         ! Comulative temperature which will be used for GDD calculation and phenology
         temp_day=temp_day+temp_hr
+
+        ! Cumulative transpiration and canopy evaporation
+        tr_day=tr_day + tr
+        evap_can_day=evap_can_day+evap_can
+
+        ! Cumulative solar radiation (energy)
+
         
         if (is_end_curr_day()) then  
           !Update GDD which is the criteria for phenology stages         
           gdd_sum= gdd_sum+temp_day/24.....
           temp_day=0
           
+          ! run Topmodel
+          ! catchment average ground water recharge [m per unit area]
+          call topmodel(gs or tr_veg, qd(t-1), qr(t)...) 
+
+          ! update soil water with the bucket model
+          ! run BucketGrid water balance: watbal
+          call soil_water(gs or tr_veg, qr(t), qd(t) ...)  
+
+          ! calculate soil water potential based on volumetric soil moisture (P-V curve)
+
+          call soil_water_p(soil_water_v) 
+
           ! Update phenological stages according to growing degree day     
           call phenology(gdd_sum.....)                                    
           
           if (is_pheno_on()) then ! Only when crop/vegetation is present
             ! Update daily variables: LAI, Aboveground & Belowground biomass according to phenological stages
             ! also litter input if running yasso on hourly or daily step
-            call carbon_allocation_day(pheno_stage, .....)     
+            call carbon_allocation_day(pheno_stage, npp_sum_day.....)     
           end if
-      
+
+          ! update soil respiration, should we update soil respiration hourly or daily? 
+          call yasso20_day(litter, soilwater,......) 
+
           ! We could also put yasso here can do the daily calculation for NEE
           ! call yasso20_day()
           ! nee_day= .......
 
           call write_output_day()                   ! Write output for daily variables
+
+          gpp_sum_day =0
+          npp_sum_day =0
+          tr_day      =0
+          evap_can_day=0
+          
         end if
 
         if (is_end_curr_year() .or. is_pheno_harvest() ) then
-          call carbon_allocation_yr(pheno_stage, gpp_sum, .....)   ! calculate yield, harvest biomass, 
+          call carbon_allocation_yr(pheno_stage, gpp_sum_year, .....)   ! calculate yield, harvest biomass, 
                                                                    ! and litter input if running yasso  
           
           ! We could also put yasso here to do yearly calculation for NEE
-          ! call yasso20_day()
+          ! call yasso20_yr()
 
           call write_output_day()                   ! Write output for yearly variables
 
