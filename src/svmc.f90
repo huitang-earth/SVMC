@@ -92,7 +92,7 @@ program SVMC
         
           ! Update transpiration, canopy evaporation...
           ! CanopyGrid in spafhy...
-          call canopy_water_flux(gs, tr, evap_can,.....)       
+          call canopy_water_flux(gs, Rn, Ta, Prec, Rg, Par, VPD, U=2.0, CO2=380.0, Rew=1.0, beta=1.0, P=101300.0)       
         
         end if
         
@@ -127,6 +127,9 @@ program SVMC
           ! run Topmodel
           ! catchment average ground water recharge [m per unit area]
           call topmodel(gs or tr_veg, qd(t-1), qr(t)...) 
+
+          ! run CanopyGrid (spafhy) (move this function in hourly cycle)
+          ! call canopy_water_flux(gs, Rn, Ta, Prec, Rg, Par, VPD, U=2.0, CO2=380.0, Rew=1.0, beta=1.0, P=101300.0)
 
           ! update soil water with the bucket model
           ! run BucketGrid water balance: watbal
