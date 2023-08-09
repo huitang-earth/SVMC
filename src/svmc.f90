@@ -23,7 +23,7 @@ program SVMC
   use readsoil_mod       ! module for reading soil properties (shared with yasso?)
   use phydro_mod         ! module for p-hydro
   !use alloc_mod         ! module for carbon allocation and yield
-  !use yasso20           ! placeholder for soil decomposition model, which will provide hr   
+  use yasso              ! module for soil decomposition model, which will provide heterogeneous respiration (hr)   
   use spafpy_mod         ! module for soil water bucket model, which will provide psi_soil for p-hydro
 
   implicit none
@@ -67,7 +67,6 @@ program SVMC
   !                      restart file (reproduce the status from previous experiment)
   call initialization()
 
-  
   ! Run the model
   ! Loop over time, and locations
   do t=bt,ed  ! in hour or 30 minutes, time loop 
@@ -145,10 +144,19 @@ program SVMC
             ! Update daily variables: LAI, Aboveground & Belowground biomass according to phenological stages
             ! also litter input if running yasso on hourly or daily step
             call carbon_allocation_day(pheno_stage, npp_sum_day.....)     
+            
+            ! Yasso: split input c into various yasso fractions
+            call inputs_to_fractions(leaf, root, soluble, compost, fract)
+          
           end if
 
-          ! update soil respiration, should we update soil respiration hourly or daily? 
-          call yasso20_day(litter, soilwater,......) 
+          ! Yasso: create average meteorological forcings for yasso
+          call average_met(met_daily, met_rolling, aver_size, met_state, met_ind)
+          
+          ! Yasso: update soil respiration, should we update soil respiration hourly or daily? 
+          ! resp should be an output variable
+          call decompose(param, timestep_days, c_input_awenh_day, nitr_input_day, tempr_c, &
+                                      precip_day, cstate, nstate, ctend, ntend) 
 
           ! We could also put yasso here can do the daily calculation for NEE
           ! call yasso20_day()
