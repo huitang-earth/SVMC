@@ -22,9 +22,9 @@ program SVMC
   use readclim_mod       ! module for reading reading meteorological forcing data
   use readsoil_mod       ! module for reading soil properties (shared with yasso?)
   use phydro_mod         ! module for p-hydro
-  use alloc_mod          ! module for carbon allocation and yield
+  !use alloc_mod         ! module for carbon allocation and yield
   !use yasso20           ! placeholder for soil decomposition model, which will provide hr   
-  !use soilwater_mod     ! placeholder for soil water bucket model, which will provide psi_soil for p-hydro
+  use spafpy_mod         ! module for soil water bucket model, which will provide psi_soil for p-hydro
 
   implicit none
 
@@ -133,8 +133,7 @@ program SVMC
           call soil_water(gs or tr_veg, qr(t), qd(t) ...)  
 
           ! calculate soil water potential based on volumetric soil moisture (P-V curve)
-
-          call soil_water_p(soil_water_v) 
+          call soil_water_retention_curve(soil_water_v) 
 
           ! Update phenological stages according to growing degree day     
           call phenology(gdd_sum.....)                                    
