@@ -24,7 +24,7 @@ program SVMC
   use phydro_mod         ! module for p-hydro
   !use alloc_mod         ! module for carbon allocation and yield
   use yasso              ! module for soil decomposition model, which will provide heterogeneous respiration (hr)   
-  use spafpy_mod         ! module for soil water bucket model, which will provide psi_soil for p-hydro
+  use spafhy_mod         ! module for soil water bucket model, which will provide psi_soil for p-hydro
 
   implicit none
 

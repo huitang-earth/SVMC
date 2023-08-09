@@ -1,4 +1,4 @@
-MODULE spafpy_mod
+MODULE spafhy_mod
 
 !--------------------------------------------------------------
 ! References:
@@ -12,19 +12,24 @@ MODULE spafpy_mod
   use readpara_mod       ! module for reading parameter files in ASCII
   use readclim_mod       ! module for reading reading meteorological forcing data
   use readsoil_mod       ! module for reading soil properties (shared with yasso?)
-  !use yasso20
 
   implicit none
 
   !Public member functions:
-  public :: canopy_water_flux   ! p-hydro module
+  public :: canopy_water_flux   ! require inputdata for p-hydro module
   public :: topmodel   !
   public :: soil_water
-  public :: soil_water_p
+  public :: soil_water_retention_curve
 
   private :: aerodynamics        ! aerodynamic conductances
   private :: canopy_water_snow   ! interception, evaporation and snowpack
-
+  private :: dry_canopy_et       ! Computes ET from 2-layer canopy in absense of intercepted precipitiation
+                                 ! This will be replaced by p-hydro when p-hydro is turned on
+  private :: penman_monteith     !
+  private :: e_sat               !
+  private :: set_soilwaterState   !
+  private :: hydrCond             ! 
+  private :: relative_evaporation !
 
 contains
   
@@ -787,7 +792,7 @@ contains
 
   END SUBROUTINE e_sat
 
-  SUBROUTINE set_soilwateState(soilwater_state)
+  SUBROUTINE set_soilwaterState(soilwater_state)
   ! !ARGUMENTS
     type(soilwater_type), intent(inout) :: soilwater_state                         ! 
 
@@ -801,7 +806,7 @@ contains
   ! organic top layer; maximum that can be hold is Fc
   soilwater_state%Wliq_top = soilwater_state%Fc_top * soilwater_state%WatStoTop / soilwater_state%MaxStoTop
   soilwater_state%Ree      = relative_evaporation(soilwater_state)
-  END SUBROUTINE set_soilwateState
+  END SUBROUTINE set_soilwaterState
         
   real(r8) FUNCTION hydrCond(soilwater_state)
   
@@ -824,9 +829,9 @@ contains
   ! Returns:
   !  f - [-], array or grid of 
   ! ---------------------
-    f = max(0.0, min(0.98*soilwater_state%Wliq_top/soilwater_state%rw_top, 1.0))
+    relative_evaporation = max(0.0, min(0.98*soilwater_state%Wliq_top/soilwater_state%rw_top, 1.0))
     return
   END FUNCTION relative_evaporation
   
 
-end module spafpy_mod
+end module spafhy_mod
