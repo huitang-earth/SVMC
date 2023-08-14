@@ -61,8 +61,6 @@ MODULE readctrl_mod
     output_directory='/cluster/work/users/ovewh/'
     output_filename ='test.nc' 
 
-
-
     ! Reading namelist
     open(unitcommand, file='./ctrl_namelist', status='old', form='formatted', err=999)
     read(unitcommand, ctrl_namelist, iostat=readerror)
