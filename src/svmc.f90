@@ -17,23 +17,32 @@
 
 program SVMC
 
-  use netcdf             ! library for processing netcdf files
-  use readpara_mod       ! module for reading parameter files in ASCII
-  use readclim_mod       ! module for reading reading meteorological forcing data
-  use readsoil_mod       ! module for reading soil properties (shared with yasso?)
-  use phydro_mod         ! module for p-hydro
-  !use alloc_mod         ! module for carbon allocation and yield
-  use yasso              ! module for soil decomposition model, which will provide heterogeneous respiration (hr)   
-  use spafhy_mod         ! module for soil water bucket model, which will provide psi_soil for p-hydro
+  use netcdf                    ! library for processing netcdf files
+  use initialization_mod        ! initialize svm model
+  use readctrl_mod              ! module for reading control parameters from namelist file
+  use readvegpara_mod           ! module for reading vegetation parameter from namelist file
+  use readsoilpara_mod          ! module for reading soil parameter from namelist file 
+  use readclim_mod              ! module for reading reading meteorological forcing data
+  use io_mod                    ! manage input/output of the model
+
+  use phydro_mod                ! module for p-hydro
+  use spafhy_mod                ! module for soil water bucket model, which will provide psi_soil for p-hydro
+  !use alloc_mod                ! module for carbon allocation and yield
+  use yasso                     ! module for soil decomposition model, which will provide heterogeneous respiration (hr)   
 
   implicit none
 
-  !Loop variables
+  ! Loop variables
   !***********************************
-  integer   :: i, j, k, t
-
+  integer         :: i, j, k, t
+  integer         :: step_nc_hr, step_nc_day, step_clim, step_lai
+  real(kind=dp)   :: tot_hour, tot_hour_end, juldate, start_date, end_date
+  real            :: start_clim_time, end_clim_time 
+  real            :: start_lai_time, end_lai_time
+  
+  integer         :: ntim_clim, ntim_lai, ntim_out_hr, ntime_out_day
+ 
   !***********************************
-
   !Model variables
   !***********************************
   integer   ::
@@ -48,10 +57,10 @@ program SVMC
   real     ::    kphio     ! Apparent quantum yield efficiency (unitless).
   real     ::    psi_soil  ! soil water potential (Mpa)
   real     ::    rdark = 0 !
-  real     ::    par_plant !  A list of plant hydraulic parameters (will be defined in readpara_mod.f90)
-  real     ::   par_cost = NULL  ! A list of cost parameters
   character(len=200)  :: opt_hypothesis=''   ! character, Either "Lc" or "PM"
 
+  type(par_plant_type)          :: par_plant           ! A list of plant hydraulic parameters (will be defined in readpara_mod.f90).
+  type(par_cost_type)           :: par_cost            ! A list of cost parameters (will be defined in readpara_mod.f90).
 
   character(len=200)  ::
   real,dimension(:,:), allocatable
@@ -65,41 +74,112 @@ program SVMC
   ! (4) Different modes: cold start (everything bareground); 
   !                      initial file (soil carbon and moisture status provided either from obs or previous experiment)
   !                      restart file (reproduce the status from previous experiment)
-  call initialization()
+  
+  !***********************************
+  call initialization
+   
+  psi_soil=0
+
+
+  !***********************************
+  ! Set time control parameters
+  !***********************************
+  
+  start_date=juldate(start_date_day, start_date_hour)
+  end_date  =juldate(end_date_day, end_date_hour)
+ 
+  ! Calculate total hours of the simulation
+  tot_hour_end= (juldate(start_date_day, start_date_hour) - juldate(end_date_day, end_date_hour))*24  
+  ntim_out_hr = mod(tot_hour_end, time_step_output)
+  ntim_out_day= mod(tot_hour_end, 24)
 
   ! Run the model
+  tot_hour=0.0
+  step_nc_hr=0
+  step_nc_day=0
+
+  ! Read time series of input data
+  call netCDF_readTime(input_climfile, ntim_clim, start_clim_time, end_clim_time)
+  call netCDF_readTime(input_laifile, ntim_lai, start_lai_time, end_lai_time)
+  
+  ! To simplify the time management, specify the julian start date of the inputdata by hand.
+  start_clim_juldate=juldate(20201231,233000)
+  start_lai_juldate =juldate(20210101,000000)
+  
+  ! step the starting time steps for reading input files
+  step_clim = floor((start_date-start_clim_juldate)*24)+1
+  step_lai  = floor(start_date-start_lai_juldate)+1
+   
   ! Loop over time, and locations
-  do t=bt,ed  ! in hour or 30 minutes, time loop 
+  do while (tot_hour .le. tot_hour_end)  ! in hour or 30 minutes, time loop 
     
-    do i=1,nsite  ! site loop (we do not use lon-lat box to allow the flexibility to run sites or regional/global simulations)
+    do i=1,num_sites  ! site loop (we do not use lon-lat box to allow the flexibility to run sites or regional/global simulations)
       
-      do m=1,ncrop ! crop/pft loop, 
-                   ! Do we really need it? We can run individual experiments to represent different crops 
-                   ! This may help for scaling up?
+      do m=1,num_pft   ! crop/pft loop
+                       ! Do we really need it? We can run individual experiments to represent different crops 
+                       ! This may help for scaling up?
 
-        if (is_pheno_on()) then ! Only when crop/vegetation is present
-          
-          ! need a bit input preparation for runnnig phydro
-          call pmodel_input_prep()
-          
+        !if (is_pheno_on()) then ! Only when crop/vegetation is present, can be turned off with prescribed LAI
+        ! need a bit input preparation for runnnig phydro
+        
+          ! call pmodel_input_prep()
+
+          ! Determine whether to read new lai data
+          ! Only update LAI daily
+          if (mod(tot_hour,24) .eq. 0) then
+            call netCDF_readlai(input_laifile, lai, step_lai)
+            step_lai=step_lai+1
+            fapar= 1-exp(-k*LAI)
+          end if
+
+          ! Determine whether to read new climate variables
+          ! if () then
+          call netCDF_readClim(input_climfile, temp, ppfd, prec, sh, rh, vpd, pres, co2, step_clim)
+          step_clim=step_clim+1
+          ! end if
+
           ! run phydro to estimate photosynthetic rate (a) and stomatal conductance (gs)
-          call pmodel_hydraulics_numerical(tc(t), ppfd(t), vpd(t), co2, sp(t), fapar(t), kphio, psi_soil(t-1), rdark = 0,  &
-                               par_plant, par_cost = NULL, opt_hypothesis = "PM")
+          ! At what time scale the optimization should work need to be tested!!!!
+          
+          call pmodel_hydraulics_numerical(temp-273.15, ppfd*3600*24, vpd, co2*1000000, pres, fapar, &
+                                 kphio, psi_soil, 0,                                                 &
+                                 conductivity, psi50, b, alpha, gamma,                               &
+                                 opt_hypothesis = "PM",                                              &
+                                 jmax, dpsi, gs, aj, ci, chi, vcmax, profit, chi_jmax_lim            &
+                                 )
 
-          ! Update gpp, npp, ar
-          call carbon_allocation_hr(a,....)          
+          ! Carbon allocation: update gpp, npp, ar ....
+          ! call carbon_allocation_hr(a,....)          
         
           ! Update transpiration, canopy evaporation...
           ! CanopyGrid in spafhy...
-          call canopy_water_flux(gs, Rn, Ta, Prec, Rg, Par, VPD, U=2.0, CO2=380.0, Rew=1.0, beta=1.0, P=101300.0)       
+          call canopy_water_flux(gs, ppfd*fapar*, temp, prec, Rg, Par, VPD, U=2.0, co2, Rew=1.0, beta=1.0, P=101300.0)       
         
-        end if
+
+        !end if  !phenology
         
         ! Calculation of NEE & LATENT heat flux
         nee= gpp-ar-hr
         et = tr+evap_can(temp, rad)+evap_soil(temp, rad)
 
-        call write_output_hr()
+        ! Write hourly output at output time step frequency
+
+        if ( mod((tot_hour,time_step_output).eq.0. ) then
+            
+          !Write hourly output for this time step
+          !************************************************************************
+          if(step_nc_hr.eq.0)then
+            !Initialize netcdf file
+            call netCDF_prepareOUTPUT(output_filename_hr, lon_sites, lat_sites, ntim_out_hr)
+          end if
+
+          call netCDF_writeOUTPUT(output_filename_hr, "GPP", gpp, tot_hour/24, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "Evap", tot_evap, tot_hour/24, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "Transp", tr, tot_hour/24, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "SoilMoist", soilwater_state%WatSto, tot_hour/24, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "SoilMoistPot", smp, tot_hour/24, step_nc_hr)
+          step_nc_hr= step_nc_hr+1 
+        endif
         
         ! Comulative parts can be a separate module in the future
         ! Cumulative GPP or NPP which will be used for carbon allocation on daily or yearly scale. 
@@ -118,7 +198,7 @@ program SVMC
         ! Cumulative solar radiation (energy)
 
         
-        if (is_end_curr_day()) then  
+        if ((mod(tot_hour,24) .eq. 0).and.(tot_hour .gt. 0)) then    ! here assume the start time is always the beginning of the day!
           !Update GDD which is the criteria for phenology stages         
           gdd_sum= gdd_sum+temp_day/24.....
           temp_day=0
@@ -162,7 +242,14 @@ program SVMC
           ! call yasso20_day()
           ! nee_day= .......
 
-          call write_output_day()                   ! Write output for daily variables
+          ! Write output for daily variables
+          if(step_nc_day.eq.0)then
+            !Initialize netcdf file
+            call netCDF_prepareOUTPUT(output_filename_day, lon_sites, lat_sites, ntim_out_day)
+          end if
+
+          call netCDF_writeOUTPUT(output_filename_day, "HeteroResp", hr, tot_hour/24, step_nc_day)           
+          step_nc_day= step_nc_day+1                
 
           gpp_sum_day =0
           npp_sum_day =0
@@ -172,6 +259,7 @@ program SVMC
         end if
 
         if (is_end_curr_year() .or. is_pheno_harvest() ) then
+
           call carbon_allocation_yr(pheno_stage, gpp_sum_year, .....)   ! calculate yield, harvest biomass, 
                                                                    ! and litter input if running yasso  
           
@@ -183,10 +271,14 @@ program SVMC
           gpp_sum_year=0
           npp_sum_year=0
           gdd_sum=0  
+
         end if
 
       end do ! m
     end do  !i
+
+    ! advance time step
+    tot_hour=tot_hour + time_step
   end do ! t
 
   call write_restart()
