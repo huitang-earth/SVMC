@@ -276,42 +276,42 @@ contains
     real(r8) :: eff_porosity! v/v, volume of ice
  
   ! Cosby et al. Table 5     
-    min_watsat = 0.489_r8 - 0.00126_r8*sand
-    min_bsw    = 2.91 + 0.159*clay
-    min_sucsat = 10._r8 * ( 10._r8**(1.88_r8-0.0131_r8*sand) )            
+  !  min_watsat = 0.489_r8 - 0.00126_r8*sand
+  !  min_bsw    = 2.91 + 0.159*clay
+  !  min_sucsat = 10._r8 * ( 10._r8**(1.88_r8-0.0131_r8*sand) )            
     !min_xksat  = 0.0070556 *( 10.**(-0.884+0.0153*sand) ) ! mm/s, from table 5 
 
-    om_watsat  = 0.93_r8 
-    om_bsw     = 2.7_r8
-    om_sucsat  = 10.3_r8    
+  !  om_watsat  = 0.93_r8 
+  !  om_bsw     = 2.7_r8
+  !  om_sucsat  = 10.3_r8    
     ! om_xksat = 0.28_r8
 
-    watsat     = (1._r8 - om_frac) * min_watsat + om_watsat*om_frac
-    bsw        = (1._r8 - om_frac) * min_bsw + om_bsw*om_frac  
-    sucsat     = (1._r8 - om_frac) * min_sucsat + om_sucsat*om_frac  
+  !  watsat     = (1._r8 - om_frac) * min_watsat + om_watsat*om_frac
+  !  bsw        = (1._r8 - om_frac) * min_bsw + om_bsw*om_frac  
+  !  sucsat     = (1._r8 - om_frac) * min_sucsat + om_sucsat*om_frac  
     ! hksat    = ?
 
     ! Hui: there is no soil ice in spaphy???? 
     !vol_ice = min(watsat, h2osoi_ice_col/(dz(c,j)*denice))
-    vol_ice = 0.0_r8   
-    eff_porosity = max(0.01_r8, watsat-vol_ice)
+  !  vol_ice = 0.0_r8   
+  !  eff_porosity = max(0.01_r8, watsat-vol_ice)
 
     !soil_depth=soilwater_state%MaxWatSto/denh2o/watsat
     !soil depth is parameterized in spaphy (40 cm by default)
-    vol_liq = min(eff_porosity, soilwater_state%WatSto/(soil_depth*denh2o))
+  !  vol_liq = min(eff_porosity, soilwater_state%WatSto/(soil_depth*denh2o))
 
     ! relative saturation, [0, 1]
-    s = max(vol_liq/eff_porosity,0.01_r8)
+  !  s = max(vol_liq/eff_porosity,0.01_r8)
       
     !compute soil suction potential, negative
-    smp = -sucsat*s**(-bsw)
+  !  smp = -sucsat*s**(-bsw)
     !hk=imped*hksat*s**(2._r8*bsw+3._r8)  ! Hui: This is similar to Spaphy
 
     !compute derivative
-    if(present(dsmpds))then
-       dsmpds=-bsw*smp/s
+  !  if(present(dsmpds))then
+  !     dsmpds=-bsw*smp/s
        !dhkds=(2._r8*bsw+3._r8)*hk/s
-    endif
+  !  endif
 
   !--- Van Genuchten scheme based on FatesHydro (parameters from Launiainen et al. Forests, 2022)
     
