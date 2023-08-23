@@ -23,13 +23,15 @@ MODULE readctrl_mod
   implicit none
 
   !Input files/settings
+
+  integer,parameter :: dp=selected_real_kind(P=15)
   
   integer :: start_date_day, start_date_hour, time_step, &
              end_date_day, end_date_hour
-  real    :: time_step
-  character(len=256)  :: output_directory, output_filename
-
-
+  integer :: num_sites        ! This can be set by reading input file
+  real    :: time_step, time_step_output
+  character(len=256)  :: output_directory, output_filename, input_directory, input_climfile, input_lai
+   
   subroutine readctrl_namelist
 
     use par_mod
@@ -49,15 +51,26 @@ MODULE readctrl_mod
     time_step, &
     end_date_day, &
     end_date_hour, &
+    input_directory, &
+    input_climfile, &
+    input_laifile, &
+    time_step_output, &
     output_directory, &
     output_filename
     
     ! Presetting namelist command
-    start_date_day  =20190301
+    start_date_day  =20210501
     start_date_hour =000000
-    time_step       =1               ! hour
-    end_date_day    =20191001
+    time_step       =0.5               ! hours
+    end_date_day    =20211001
     end_date_hour   =000000
+    num_sites       =1                 ! number of sites, should also be read from input file?
+    ! lon_sites     = (/ /)            ! longitude of sites (not needed, can be well defined input file)
+    ! lat_sites     = (/ /)            ! latitude of sites (not needed, can be well defined by input file) 
+    input_directory =''
+    input_climfile      ='FieldObs_Qvidja.2021.hr.nc'         
+    input_laifile       ='FieldObs_Qvidja.2021.lai.nc'
+    time_step_output=1.0
     output_directory='/cluster/work/users/ovewh/'
     output_filename ='test.nc' 
 

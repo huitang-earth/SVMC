@@ -22,9 +22,35 @@ MODULE readvegpara_mod
 
   character(len=256), public  :: opt_hypothesis        ! character, Either "Lc" or "PM"      
 
-! vegetation status (p-hydro)
+  type, public :: par_env_type
+    real(r8) :: viscosity_water     
+    real(r8) :: density_water             
+    real(r8) :: patm
+    real(r8) :: tc
+    real(r8) :: vpd                   
+  end type par_env_type
+
+  type, public :: par_photosynth_type
+    real(r8) :: kmm  
+    real(r8) :: gammastar             
+    real(r8) :: phi0
+    real(r8) :: Iabs
+    real(r8) :: ca  
+    real(r8) :: patm
+    real(r8) :: delta      
+  end par_photosynth_type
+
+  type, public :: optimizer_type
+    real(r8) :: logjmax  
+    real(r8) :: dpsi                
+  end optimizer_type
+
+  ! vegetation status (p-hydro)
   real(r8), parameter :: kv = 0.4  ! von Karman constant (-)
   real(r8)            ::  beta   ! s/m, from Campbell & Norman eq. (7.33) x 42.0 molm-3
+
+  real(r8)            :: kphio=0.087182   ! Apparent quantum yield efficiency (unitless).
+  real(r8)            :: k=0.5            ! dimensionless constant, assigned a generic value of 0.5, Beer's law.
 
   ! Canopy water parameters (Spafhy)
   ! canopy interception
@@ -75,7 +101,7 @@ MODULE readvegpara_mod
   real(r8) :: zground   
   real(r8) :: zo_ground 
 
-contains
+  contains
 
   subroutine par_init(this)
 
@@ -102,6 +128,8 @@ contains
     old=.false.
 
     namelist /veg_namelist/ &
+      num_pft,
+      pft_type,
       conductivity, &
       psi50, &
       b, &
