@@ -2,60 +2,39 @@ MODULE phydro_mod
 
 !--------------------------------------------------------------
 ! References:
-! Joshi, Jaideep, Benjamin D. Stocker, Florian Hofhansl, Shuangxi Zhou, Ulf Dieckmann, and Iain Colin Prentice. 
+! Joshi, Jaideep, Benjamin D. Stocker, Florian Hofhansl, 
+! Shuangxi Zhou, Ulf Dieckmann, and Iain Colin Prentice. 
 ! Towards a Unified Theory of Plant Photosynthesis and Hydraulics.
-! Nature Plants 8, no. 11: 1304–16. https://doi.org/10.1038/s41477-022-01244-5.
+! Nature Plants 8, no. 11: 1304–16. 
+! https://doi.org/10.1038/s41477-022-01244-5.
 !--------------------------------------------------------------
 
 ! Modules
   use netcdf             ! library for processing netcdf files
-  use readpara_mod       ! module for reading parameter files in ASCII
-  use readclim_mod       ! module for reading reading meteorological forcing data
-  use readsoil_mod       ! module for reading soil properties (shared with yasso?)
-  use phydro_mod         ! module for p-hydro
-  use alloc_mod          ! module for carbon allocation and yield
-  !use yasso20
+  use readctrl_mod       ! module for reading control parameters
+  use readvegpara_mod    ! module for vegetation parameters
+  use readsoilpara_mod   ! module for reading soil properties (shared with yasso?)
 
   implicit none
 
   !Public member functions:
   public :: pmodel_hydraulics_numerical   ! p-hydro module
 
-  type, public :: par_env_type
-    real(r8) :: viscosity_water     
-    real(r8) :: density_water             
-    real(r8) :: patm
-    real(r8) :: tc
-    real(r8) :: vpd                   
-  end type par_env_type
-
-  type, public :: par_photosynth_type
-    real(r8) :: kmm  
-    real(r8) :: gammastar             
-    real(r8) :: phi0
-    real(r8) :: Iabs
-    real(r8) :: ca  
-    real(r8) :: patm
-    real(r8) :: delta      
-  end par_photosynth_type
-
-  type, public :: optimizer_type
-    real(r8) :: logjmax  
-    real(r8) :: dpsi                
-  end optimizer_type
 
 contains
   
   !---------------------------------------------------------
-  SUBROUTINE pmodel_hydraulics_numerical(tc, ppfd, vpd, co2, sp, fapar, kphio, psi_soil, rdark = 0, par_plant, par_cost = NULL, opt_hypothesis = "PM")
+  SUBROUTINE pmodel_hydraulics_numerical(tc, ppfd, vpd, co2, sp, fapar, kphio, & 
+                     psi_soil, rdark = 0,                                      &
+                     opt_hypothesis = "PM",                                    &
+                     jmax, dpsi, gs, aj, ci, chi, vcmax, profit, chi_jmax_lim)
     !
     ! !DESCRIPTION:
-    ! The hydraulic p-model (HyPE), numerical version
+    ! The hydraulic p-model (p-hydro), numerical version
     ! Calculates the carboxylation capacity, as coordinated to a given electron-transport limited assimilation rate.
     !
     ! !USES:
-
-    ! use soilwater_mod   ! Placeholder for soil water bucket model, which will provide psi_soil?
+    use readvegpara_mod
 
     ! !ARGUMENTS:
     real(r8)      , intent(in)    :: tc     ! Air temperature (tc), (degrees C)
@@ -67,8 +46,7 @@ contains
     real(r8)      , intent(in)    :: kphio  ! Apparent quantum yield efficiency (unitless).
     real(r8)      , intent(in)    :: psi_soil  ! soil water potential (Mpa)
     real(r8)      , intent(in)    :: rdark = 0 ! Dark respiration \eqn{Rd} (mol C m-2)
-    type(par_plant_type), intent(in)  :: par_plant           ! A list of plant hydraulic parameters (will be defined in readpara_mod.f90).
-    type(par_cost_type) , intent(in)  :: par_cost            ! A list of cost parameters (will be defined in readpara_mod.f90).
+  
 
     character(len=200)  , intent(in)  :: opt_hypothesis='PM'   ! character, Either "Lc" or "PM"
                                                              ! "Lc": Least Cost (see: rpmodel_hydraulics_numerical.R)
@@ -77,37 +55,36 @@ contains
                                                 ! \deqn{A_J = A_C} 
                                                 !  Electron transport capacity (umol/m2/s)
     real(r8)      , intent(out)   :: dpsi       ! soil-to-leaf water potential difference (\eqn{\psi_s-\psi_l}), Mpa
-    real(r8)      , intent(out)   :: gs         !  Stomatal conductance (gs, in mol C m-2 Pa-1), calculated as
+    real(r8)      , intent(out)   :: gs         ! Stomatal conductance (gs, in mol C m-2 Pa-1), calculated as
                                                 !  \deqn{ gs = A / (ca (1-\chi)) } where \eqn{A} is \code{gpp}\eqn{/Mc}.
-    real(r8)      , intent(out)   :: a          !  electron-transport limited assimilation rate (umol/m2/s)
+    real(r8)      , intent(out)   :: aj         !  electron-transport limited assimilation rate (umol/m2/s)
     real(r8)      , intent(out)   :: ci         !  leaf-internal CO2 concentration, converted to partial pressure (Pa)
-    real(r8)      , intent(out)   :: chi = ci/par_photosynth_now$ca  ! Optimal ratio of leaf internal to ambient CO2 (unitless).
-    real(r8)      , intent(out)   :: vcmax                         !   Carboxylation capacity (umol/m2/s)
-    real(r8)      , intent(out)   :: profit                   ! Net assimilation rate after accounting for costs
-    real(r8)      , intent(out)   :: chi_jmax_lim = 0      ! Analytical chi in the case of strong Jmax limitation
+    real(r8)      , intent(out)   :: chi        ! Optimal ratio of leaf internal to ambient CO2 (unitless).
+    real(r8)      , intent(out)   :: vcmax      !   Carboxylation capacity (umol/m2/s)
+    real(r8)      , intent(out)   :: profit                  ! Net assimilation rate after accounting for costs
+    real(r8)      , intent(out)   :: chi_jmax_lim      ! Analytical chi in the case of strong Jmax limitation
 
     ! ! Local variables 
+    type(par_plant_type)          :: par_plant           ! A list of plant hydraulic parameters (will be defined in readpara_mod.f90).
+    type(par_plant_type)          :: par_plant_now       ! 
+    type(par_cost_type)           :: par_cost            ! A list of cost parameters (will be defined in readpara_mod.f90).
+    type(par_cost_type)           :: par_cost_now        !
+    type(par_env_type)            :: par_env_now         ! 
+    type(par_photosynth_type)     :: par_photosynth_now  ! 
+    type(optimizer_type)          :: lj_dps              !
 
-    type(par_env_type)            :: par_env_now           ! 
-    type(par_photosynth_type)     :: par_photosynth_now    ! 
-    type(par_plant_type)          :: par_plant_now         ! 
-    type(par_cost_type)           :: par_cost_now          !
-    type(optimizer_type)          :: lj_dps                !
-
-    real     ::    fn_profit
-    real     ::    lj_dps
-    real     ::    aj
-    real     ::    
-    real     ::    
-    real     ::   
-    integer  :: i, j, k, t
+    par_plant%conductivity=conductivity
+    par_plant%psi50       =psi50
+    par_plant%b           =b
+    par_cost%alpha        =alpha
+    par_cost%gamma        =gamma
   
-    call calc_kmm(tc, p, par_photosynth_now%kmm)     !Why does this use std. atm pressure, and not p(z)?
+    call calc_kmm(tc, sp, par_photosynth_now%kmm)         !Why does this use std. atm pressure, and not p(z)?
     par_photosynth_now%gammastar = gammastar(tc, sp)
     par_photosynth_now%phi0 = kphio*ftemp_kphio(tc)
     par_photosynth_now%Iabs = ppfd*fapar
     par_photosynth_now%ca = co2*sp*1e-6             ! Convert to partial pressure
-    par_photosynth_now%patm = sp,
+    par_photosynth_now%patm = sp
     par_photosynth_now%delta = rdark
   
     par_env_now%viscosity_water = viscosity_h2o(tc, sp)
@@ -132,56 +109,73 @@ contains
     !? Replacing function "optimise_midterm_multi" in p-hydro with "setulb" in Fortran. Need more work!
     ! optimise_midterm_multi(fn_profit, psi_soil, par_cost, par_photosynth, par_plant, par_env, return_all = FALSE, opt_hypothesis)
     
-    call optimise_midterm_multi(lj_dps, psi_soil, par_cost, par_photosynth, par_plant, par_env, return_all, opt_hypothesis)
+    call optimise_midterm_multi(lj_dps, psi_soil, par_cost, par_photosynth_now, par_plant_now, par_env_now, opt_hypothesis)
     
-    profit = fn_profit(par = lj_dps, psi_soil = psi_soil, par_cost  = par_cost_now, par_photosynth = par_photosynth_now,        &
-                        par_plant = par_plant_now, par_env = par_env_now, do_optim=.false., opt_hypothesis = opt_hypothesis)
+    profit = fn_profit(lj_dps, psi_soil, par_cost, par_photosynth_now,        &
+                        par_plant, par_env_now, .false., opt_hypothesis)
   
     jmax = exp(lj_dps%logjmax)
     dpsi = lj_dps%dpsi
     
-    gs = calc_gs(dpsi=dpsi, psi_soil=psi_soil, par_plant = par_plant_now, par_env = par_env_now)
+    gs = calc_gs(dpsi, psi_soil, par_plant_now, par_env_now)
     
-    call alc_assim_light_limited(ci, aj, gs = gs, jmax = jmax, par_photosynth = par_photosynth_now)
-    a = aj
-    ci =ci
+    call calc_assim_light_limited(ci, aj, gs, jmax, par_photosynth_now)
 
-    vcmax = calc_vcmax_coordinated_numerical(a,ci, par_photosynth_now)
-  
-    chi = ci/par_photosynth_now%ca,
+    !vcmax = calc_vcmax_coordinated_numerical(a,ci, par_photosynth_now)
+    vcmax = aj*(ci + par_photosynth_now$kmm)/(ci*(1-par_photosynth_now%delta)- (par_photosynth_now$gammastar+par_photosynth_now$kmm*d))
+
+    chi = ci/par_photosynth_now%ca
     chi_jmax_lim = 0
 
   END SUBROUTINE pmodel_hydraulics_numerical
 
-  SUBROUTINE optimise_midterm_multi(lj_dps, psi_soil, par_cost, par_photosynth, par_plant, par_env, return_all, opt_hypothesis)
-    
+  SUBROUTINE optimise_midterm_multi(lj_dps, psi_soil, par_cost, par_photosynth, par_plant, par_env, opt_hypothesis)
+    !*****************************************
     ! Want maximization, how should I do? -fn for max, fn for minimum
-
-
+    ! Following:
+    ! SILAM: https://github.com/fmidev/silam-model/blob/4af0c37b110dde54f30a48a9c42591619320198e/source/da_driver.silam.mod.f90#L1251
+    ! R lbfgsb3 package: https://github.com/cran/lbfgsb3/blob/50faf23f4229a33de58f4d0c6ea36010abcb148d/R/lbfgsb3.R#L45
+    !*****************************************
     use bfgs
 
-
+    type(optimizer_type), intent(out)  :: lj_dps    ! A vector of variables to be optimized, namely, c(jmax, dpsi), the optimization parameters
+    real(r8)      , intent(in)        :: psi_soil   ! Soil water potential (Mpa)
+    type(par_plant_type), intent(in)  :: par_plant           ! A list of plant hydraulic parameters (will be defined in readpara_mod.f90).
+    type(par_cost_type) , intent(in)  :: par_cost            ! A list of cost parameters (will be defined in readpara_mod.f90).
+    type(par_env_type), intent(in)    :: par_env          ! A list of plant hydraulic parameters (will be defined in readpara_mod.f90).
+    type(par_photosynth_type) , intent(in)  :: par_photosynth            ! A list of cost parameters (will be defined in readpara_mod.f90).  
+    character(len=200)  , intent(in)  :: opt_hypothesis      ! character, Either "Lc" or "PM"
+                                                             ! "Lc": Least Cost (see: rpmodel_hydraulics_numerical.R)
+                                                             ! "PM": Profit Maximisation (see: rpmodel_hydraulics_numerical.R)  
     
-    real(optimizer_precision), dimension(:), allocatable :: wa(nwa)
+    ! local variables:
+    real(r8), dimension(1:2)            :: x, l, u, grad
+    integer,  dimension(1:2)            :: nbd
+    logical,  dimension(1:4)            :: lsave
+    integer                             :: n, m, nmax, mmax, nwa, iwa, iprint, icsave, isave(44), dsave(29), maxIterations
+    real(r8)                            :: profit, factr, gptol
+    character(len=60)                   :: task
+    real(r8), dimension(:), allocatable :: wa
 
     implicit none
 
     n=2       ! less than 1024
     m=5       ! 15 for silam the higher the better...
-
-    x=(lj_dps%logjmax,lj_dps%dpsi)
-    ! alternatively: x=(logjmax=0, dpsi=1) ?
-    l=(-10, 0.0001)
-    u=(10, 1e6)
-    nbd=(2, 2)
-    profit=?
-    grad=(1.0e+7, 1.0e+7) ! for initialization
-    grad=gradient()     ! for other steps
+    !x=(/lj_dps%logjmax,lj_dps%dpsi/)
+    x=(/0, 1/)   ! x should be the array    
+    l=(/-10, 0.0001/)
+    u=(/10, 1e6/)
+    nbd=(/2, 2/)
+   ! profit=?
+    grad=(/1.0e+7, 1.0e+7/) ! for initialization
+    !grad=gradient()     ! for other steps
     factr=1.0e+7           ! From R: https://github.com/cran/lbfgsb3/blob/50faf23f4229a33de58f4d0c6ea36010abcb148d/R/lbfgsb3.R#L45
     pgtol=1.0e-5           ! Similar to other models, e.g., R & SILAM 
     nmax = 1024            ! related to n in the beginning
     mmax = 17              ! related to m in the beginning
     nwa=2*mmax*nmax + 5*nmax + 11*mmax*mmax + 8*mmax
+    allocate(wa(nwa))
+
     !wa(nwa)=
     iwa=3*nmax
     task="START"
@@ -192,25 +186,27 @@ contains
     dsave(1:29)=0.0      !
     maxIterations=1000    ! The original model use 500, so 1000 should be fine.
      
-    print *, "Before call, f=",f,"  task number ",itask," ")
+    print *, "Before call, f=", profit,"  task number ",task, " ")
 
     do iter = 1, maxIterations
       call setulb(n, m, x, l, u, nbd, profit, grad, factr, wa, iwa, task, iprint, icsave, lsave, isave, dsave)
       
      ! Print some basic informations about the optimization process 
       print *, "lbfgsb3 parameter results:", x
-      print *, "task is ", task,
+      print *, "task is ", task
       
      ! Print
       if (task(1:2) == 'FG') then
         print *, "computing f and g at ", x
         ! Compute function value f for the sample problem.
-        profit= fn_profit(par=x, psi_soil, par_cost_now, par_photosynth_now, par_plant_now, par_env_now, do_optim=.True., opt_hypothesis)
+        lj_dps%logjmax=x(1)
+        lj_dps%dpsi=x(2)
+        profit= fn_profit(lj_dps, psi_soil, par_cost, par_photosynth, par_plant, par_env, .True., opt_hypothesis)
         print *, "At iteration", isave(34), " f =", profit
 
         ! Compute gradient g for the sample problem.
-        grad <- gradient(x, ...)
-        print *, "max(abs(g))=", max(abs(gad))
+        call gradient(grad, lj_dps, psi_soil,par_photosynth, par_plant, par_env, par_cost)
+        print *, "max(abs(g))=", max(abs(grad))
 
       else if (task(1:5) == 'NEW_X') then
         print *, "Continue"        !what is the meaning of "NEW_X"? 
@@ -226,7 +222,7 @@ contains
   END SUBROUTINE optimise_midterm_multi
 
 
-  real(r8) FUNCTION gradient(x, psi_soil, par_photosynth, par_plant, par_env, par_cost)
+  subroutine gradient(grad, par, psi_soil, par_photosynth, par_plant, par_env, par_cost)
 
     !---------------------------------------------------------------
     ! Calculates the patial derivative of profit fuction
@@ -234,53 +230,71 @@ contains
     !     derivatives (For two-dimensional root-finding algorithm, see Sect. 1.3.2 in supplementary materials of Joshi et al. 2022 for details)
     !     dFdx (For one-dimensional root-finding algorithm, see Sect. 1.3.2 in supplementary materials of Joshi et al. 2022 for details)
     !---------------------------------------------------------------
+    type(optimizer_type), intent(in)  :: par    ! A vector of variables to be optimized, namely, c(jmax, dpsi), the optimization parameters
+    real(r8)      , intent(in)    :: psi_soil   ! Soil water potential (Mpa)
+    type(par_plant_type), intent(in)  :: par_plant           ! A list of plant hydraulic parameters (will be defined in readpara_mod.f90).
+    type(par_cost_type) , intent(in)  :: par_cost            ! A list of cost parameters (will be defined in readpara_mod.f90).
+    type(par_env_type), intent(in)  :: par_env          ! A list of plant hydraulic parameters (will be defined in readpara_mod.f90).
+    type(par_photosynth_type) , intent(in)  :: par_photosynth            ! A list of cost parameters (will be defined in readpara_mod.f90).  
+    real(r8), dimension(1:2), intent(out)   :: grad
 
-    ! !ARGUMENTS
-    real(r8), intent(in) :: tk                        ! Air temperature (Kelvin)
-    real(r8), intent(in) :: dha                       ! Activation energy (J mol-1)
-    real(r8), intent(in) :: tkref = 298.15            ! tkref Reference temperature (Kelvin)
+    ! ! Local variables 
+    real(r8)           ::    jmax, dpsi
+    real(r8)           ::    gs, gsprime, X, ci, aj, vcmax
+    real(r8)           ::    g, ca, J, K, D, ks
     
-    ! !LOCAL VARIABLES:
-    real(r8)             :: kR=8.3145                 ! Universal gas constant, J/mol/K
-  
-    
-    jmax = exp(x(1))   ! Jmax in umol/m2/s (logjmax is supplied by the optimizer)
-    dpsi = x(2)
+    jmax = exp(par%logjmax)  ! Jmax in umol/m2/s (logjmax is supplied by the optimizer)
+    dpsi = par%dpsi          ! delta Psi in MPa
     
     ! Two demensional root-finding (derivatives):
     gs = calc_gs(dpsi, psi_soil, par_plant, par_env)      !* 1e6/par_photosynth$patm
     call calc_assim_light_limited(ci, aj, gs, jmax, par_photosynth)
     X=ci/par_photosynth%ca
-    gsprime = calc_gsprime(dpsi, psi_soil, par_plant, par_env)#* 1e6/par_photosynth$patm
-    J = calc_J(gs, X, par_photosynth)
-    ca = par_photosynth%ca/par_photosynth%patm*1e6
-    g = par_photosynth%gammastar/par_photosynth%ca 
-    gradient(1) = -gs*ca - par_cost$alpha * calc_djmax_dJ(ajmax, par_photosynth) * calc_dJ_dchi(gs, X, par_photosynth)
-    gradient(2) = gsprime*ca*(1-X) - par_cost$alpha * calc_djmax_dJ(ajmax, par_photosynth) * calc_dJ_ddpsi(gsprime, X, par_photosynth) - 2*par_cost$gamma*dpsi #/par_plant$psi50^2
+
+
+    K = scale_conductivity(par_plant$conductivity, par_env)
+    D = (par_env$vpd/par_env$patm)
+    gsprime = K/1.6/D*(0.5^(((psi_soil-dpsi)/par_plant%psi50)^par_plant%b))
+    
+    g  = par_photosynth$gammastar/par_photosynth$ca
+    ks = par_photosynth$kmm/par_photosynth$ca
+    ca = par_photosynth$ca/par_photosynth$patm*1e6
+    d  = par_photosynth$delta
+    J  = 4*gs*ca*(1-X)*(X+2*g)/(X*(1-d)-(g+d*ks)) 
+
+    p = par_photosynth%phi0 * par_photosynth%Iabs
+    djmax_dJ = (4*p)^3/((4*p)^2-J^2)^(3/2)   
+    
+    dJ_dchi = 4*gs*ca * ((d*(2*g*(ks + 1) + ks*(2*X - 1) + X^2) - ((X-g)^2+3*g*(1-g)))/(d*(ks + X) + g - X)^2)
+ 
+    dJ_ddpsi = 4*gsprime*ca*(1-X)*(X+2*g)/(X*(1-d)-(g+d*ks))
+}   
+    grad(1) = -gs*ca - par_cost%alpha*djmax_dJ * dJ_dchi
+    grad(2) = gsprime*ca*(1-X) - par_cost%alpha * djmax_dJ * &
+                  dJ_ddpsi - 2*par_cost%gamma*dpsi ! /par_plantpsi50^2
 
     ! One dimension root-finding (dFdx) 
-    gs = calc_gs(dpsi, psi_soil, par_plant, par_env)#* 1e6/par_photosynth$patm
-    gsprime = calc_gsprime(dpsi, psi_soil, par_plant, par_env)#* 1e6/par_photosynth$patm
-    X =  calc_x_from_dpsi(dpsi, psi_soil, par_plant, par_env, par_photosynth, par_cost)
-    J = calc_J(gs, X, par_photosynth)
-    ca = par_photosynth$ca/par_photosynth$patm*1e6
-    g = par_photosynth$gammastar/par_photosynth$ca
+    !gs = calc_gs(dpsi, psi_soil, par_plant, par_env)#* 1e6/par_photosynth$patm
+    !gsprime = calc_gsprime(dpsi, psi_soil, par_plant, par_env)#* 1e6/par_photosynth$patm
+    !X =  calc_x_from_dpsi(dpsi, psi_soil, par_plant, par_env, par_photosynth, par_cost)
+    !J = calc_J(gs, X, par_photosynth)
+    !ca = par_photosynth$ca/par_photosynth$patm*1e6
+    !g = par_photosynth$gammastar/par_photosynth$ca
   
-    djmax_dJ = calc_djmax_dJ(J, par_photosynth)
-    dJ_dchi = calc_dJ_dchi(gs, X, par_photosynth)
-    gradient(1) = -gs*ca - par_cost$alpha * djmax_dJ * dJ_dchi
+    !djmax_dJ = calc_djmax_dJ(J, par_photosynth)
+    !dJ_dchi = calc_dJ_dchi(gs, X, par_photosynth)
+    !gradient(1) = -gs*ca - par_cost$alpha * djmax_dJ * dJ_dchi
   
-    return
   
-  END FUNCTION gradient
+  END SUBROUTINE gradient
 
-  
 
   SUBROUTINE calc_kmm(tc, patm, kmm)
     !-------------------------------------------------------------------------
     ! !DESCRIPTION:
     ! Calculates the Michaelis Menten coefficient for Rubisco-limited photosynthesis
-    ! Calculates the Michaelis Menten coefficient of Rubisco-limited assimilation as a function of temperature and atmospheric pressure.
+    ! Calculates the Michaelis Menten coefficient of Rubisco-limited assimilation
+    !                 as a function of temperature and atmospheric pressure.
     ! From function "calc_kmm" in rpmodel
     ! References: 
     !    Farquhar,  G.  D.,  von  Caemmerer,  S.,  and  Berry,  J.  A.:
@@ -313,15 +327,16 @@ contains
     ! conversion to Kelvin
     tk     = tc + 273.15
   
-    kc     = kc25 * ftemp_arrh( tk, dha=dhac )
-    ko     = ko25 * ftemp_arrh( tk, dha=dhao )
+    kc     = kc25 * ftemp_arrh( tk, dhac )
+    ko     = ko25 * ftemp_arrh( tk, dhao )
   
     po     = kco * (1e-6) * patm         ! O2 partial pressure
     kmm    = kc * (1.0 + po/ko)
 
   END SUBROUTINE calc_kmm
 
-  real(r8) FUNCTION ftemp_arrh(tk, dha, tkref)
+
+  real(r8) FUNCTION ftemp_arrh(tk, dha)
 
     !---------------------------------------------------------------
     ! Calculates the Arrhenius-type temperature response
@@ -333,10 +348,10 @@ contains
     ! !ARGUMENTS
     real(r8), intent(in) :: tk                        ! Air temperature (Kelvin)
     real(r8), intent(in) :: dha                       ! Activation energy (J mol-1)
-    real(r8), intent(in) :: tkref = 298.15            ! tkref Reference temperature (Kelvin)
     
     ! !LOCAL VARIABLES:
     real(r8)             :: kR=8.3145                 ! Universal gas constant, J/mol/K
+    real(r8)             :: tkref = 298.15            ! tkref Reference temperature (Kelvin)
   
     ! Note that the following forms are equivalent:
     ! ftemp_arrh = exp( dha * (tk - 298.15) / (298.15 * kR * tk) )
@@ -369,7 +384,7 @@ contains
                                                       ! Their value in molar concentration units is multiplied with 101325 Pa to yield 4.332 Pa                                                 
     real(r8)             ::  patm0 = 101325           ! Atmospheric pressure at sea level (Pa), defaults to 101325 Pa.
 
-    gammastar = gs25_0 * patm / patm0 * ftemp_arrh((tc + 273.15), dha=dha)
+    gammastar = gs25_0 * patm / patm0 * ftemp_arrh((tc + 273.15), dha)
   
     return
   
@@ -496,7 +511,8 @@ contains
     ! Calculates the density of water (kg/m^3) as a function of temperature and atmospheric pressure, using the Tumlirz Equation.
     ! From function "viscosity_h2o" in p-model
     ! References:
-    ! F.H. Fisher and O.E Dial, Jr. (1975) Equation of state of pure water and sea water, Tech. Rept., Marine Physical Laboratory, San Diego, CA.
+    ! F.H. Fisher and O.E Dial, Jr. (1975) Equation of state of pure water and sea water, 
+    ! Tech. Rept., Marine Physical Laboratory, San Diego, CA.
     !---------------------------------------------------------------
 
     ! !ARGUMENTS
@@ -534,7 +550,7 @@ contains
           -(2.295063e-20)*tc*tc*tc*tc*tc*tc*tc*tc*tc
   
     ! Convert pressure to bars (1 bar <- 100000 Pa)
-    pbar = (1e-5)*p
+    pbar = (1e-5)*patm
   
     ! Calculate the specific volume (cm^3 g^-1):
     v = vinf + my_lambda/(po + pbar)
@@ -586,9 +602,14 @@ contains
     ! ! Local variables 
     real(r8)     ::    K, D
 
-    K = scale_conductivity(par_plant$conductivity, par_env)
+    K = scale_conductivity(par_plant%conductivity, par_env)
     D = (par_env%vpd/par_env%patm)
-    calc_gs=K/1.6/D * -integral_P(dpsi, psi_soil, par_plant%psi50, par_plant%b)
+    ! Analytical solution 
+    !calc_gs=K/1.6/D * (-integral_P(dpsi, psi_soil, par_plant%psi50, par_plant%b))
+
+    ! Use approximation of the integral instead
+    calc_gs=K/1.6/D * dpsi * (0.5^(((psi_soil-dpsi/2)/par_plant%psi50)^par_plant%b))
+    
     ! papprox = P(psi_soil-dpsi/2, par_plant$psi50, par_plant$b)
     ! papprox = P(psi_soil, par_plant$psi50, par_plant$b)-Pprime(psi_soil, par_plant$psi50, par_plant$b)*dpsi/2.5
     ! K/1.6/D * dpsi * papprox
@@ -661,11 +682,65 @@ contains
     B = gs * ca - gs * 2 * par_photosynth%gammastar - jlim*(1-d)
     C = gs * ca * 2*par_photosynth%gammastar + jlim * (par_photosynth%gammastar + d*par_photosynth%kmm)
   
-    ci = QUADM(A, B, C)  !? Fortran library for solving quadratic equation, check CTSM
+    call quadratic(A,B,C,ci)
+    !ci = QUADM(A, B, C)  !? Fortran library for solving quadratic equation, check CTSM
     aj = gs*(ca-ci)
     !vcmax_pot <- a*(ci + par$kmm)/(ci - par$gammastar)
   
   END SUBROUTINE calc_assim_light_limited
+
+
+  subroutine quadratic (a, b, c, r1)
+     !
+     ! !DESCRIPTION:
+     !==============================================================================!
+     !----------------- Solve quadratic equation for its two roots -----------------!
+     !==============================================================================!
+     ! Solution from Press et al (1986) Numerical Recipes: The Art of Scientific
+     ! Computing (Cambridge University Press, Cambridge), pp. 145.
+     !
+     ! !REVISION HISTORY:
+     ! 4/5/10: Adapted from /home/bonan/ecm/psn/An_gs_iterative.f90 by Keith Oleson
+     !
+     ! !USES:
+     implicit none
+     !
+     ! !ARGUMENTS:
+     real(r8), intent(in)  :: a,b,c       ! Terms for quadratic equation
+     real(r8), intent(out) :: r1          ! Roots of quadratic equation
+     !
+     ! !LOCAL VARIABLES:
+     real(r8) :: q                        ! Temporary term for quadratic solution
+     real(r8) :: root                     ! Term that will have a square root taken
+     !------------------------------------------------------------------------------
+    
+     if (a == 0._r8) then
+        print *, "error 1"
+        return
+     end if
+
+     root = b*b - 4._r8*a*c
+     if ( root < 0.0 )then
+        if ( -root < 3.0_r8*epsilon(b) )then
+           root = 0.0_r8
+        else
+           print *, "error 2"
+           return
+        end if
+     end if
+   
+    if (a == 0._r8) then
+      if (b == 0._r8) then
+        r1 = 0.0
+      else
+        r1 = -c/b
+      end if
+    else
+      q = -0.5_r8 * (b + sqrt(root))
+      r1 = q / a
+    end if
+         
+  end subroutine quadratic
 
   real(r8) FUNCTION fn_profit(par, psi_soil, par_cost, par_photosynth, par_plant, par_env, do_optim, opt_hypothesis)
     !---------------------------------------------------------------
@@ -698,8 +773,8 @@ contains
     ! light-limited assimilation
     call calc_assim_light_limited(ci, aj, gs, jmax, par_photosynth)  ! Aj in umol/m2/s
 
-    vcmax = calc_vcmax_coordinated_numerical(aj,ci, par_photosynth)
-  
+    vcmax = aj*(ci + par_photosynth$kmm)/(ci*(1-par_photosynth%delta)- (par_photosynth$gammastar+par_photosynth$kmm*d))
+
     costs = par_cost%alpha * jmax + par_cost%gamma * dpsi^2     !((abs((-dpsi)/par_plant$psi50)))^2  
     benefit = 1                                                 !(1+1/(par_photosynth$ca/40.53))/2
     dummy_costs = 0*exp(20*(-abs(dpsi/4)-abs(jmax/1)))          ! ONLY added near (0,0) for numerical stability. 
