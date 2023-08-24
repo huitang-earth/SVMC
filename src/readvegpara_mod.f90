@@ -9,67 +9,72 @@ MODULE readvegpara_mod
   type, public :: par_plant_type
     !!**** Parameters for P-hydro model
     ! Plant hydraulic parameters
-    real(r8) :: conductivity     ! Leaf conductivity (m) (for stem, this could be Ks*HV/Height)
-    real(r8) :: psi50             ! Leaf P50 (Mpa)
-    real(r8) :: b                     ! Slope of leaf vulnerability curve 
+    real(8) :: conductivity     ! Leaf conductivity (m) (for stem, this could be Ks*HV/Height)
+    real(8) :: psi50             ! Leaf P50 (Mpa)
+    real(8) :: b                     ! Slope of leaf vulnerability curve 
   end type par_plant_type
 
   type, public :: par_cost_type
     ! A list of cost parameters
-    real(r8) :: alpha  !cost of Jmax
-    real(r8) :: gamma    !cost of hydraulic repair
+    real(8) :: alpha  !cost of Jmax
+    real(8) :: gamma    !cost of hydraulic repair
   end type par_cost_type
 
-  character(len=256), public  :: opt_hypothesis        ! character, Either "Lc" or "PM"      
+  character(len=256), public  :: opt_hypothesis        ! character, Either "Lc" or "PM"       num_pft, &
+  integer  :: pft_type, num_pft
+  real(8)  :: conductivity, psi50, b, alpha, gamma
 
   type, public :: par_env_type
-    real(r8) :: viscosity_water     
-    real(r8) :: density_water             
-    real(r8) :: patm
-    real(r8) :: tc
-    real(r8) :: vpd                   
+    real(8) :: viscosity_water     
+    real(8) :: density_water             
+    real(8) :: patm
+    real(8) :: tc
+    real(8) :: vpd                   
   end type par_env_type
 
   type, public :: par_photosynth_type
-    real(r8) :: kmm  
-    real(r8) :: gammastar             
-    real(r8) :: phi0
-    real(r8) :: Iabs
-    real(r8) :: ca  
-    real(r8) :: patm
-    real(r8) :: delta      
-  end par_photosynth_type
+    real(8) :: kmm  
+    real(8) :: gammastar             
+    real(8) :: phi0
+    real(8) :: Iabs
+    real(8) :: ca  
+    real(8) :: patm
+    real(8) :: delta      
+  end type par_photosynth_type
 
   type, public :: optimizer_type
-    real(r8) :: logjmax  
-    real(r8) :: dpsi                
-  end optimizer_type
+    real(8) :: logjmax  
+    real(8) :: dpsi                
+  end type optimizer_type
 
-  ! vegetation status (p-hydro)
-  real(r8), parameter :: kv = 0.4  ! von Karman constant (-)
-  real(r8)            ::  beta   ! s/m, from Campbell & Norman eq. (7.33) x 42.0 molm-3
+  ! constants needed by p-hydro
+  real(8)            :: kv = 0.4  ! von Karman constant (-)
+  real(8)            :: beta   ! s/m, from Campbell & Norman eq. (7.33) x 42.0 molm-3
 
-  real(r8)            :: kphio=0.087182   ! Apparent quantum yield efficiency (unitless).
-  real(r8)            :: k=0.5            ! dimensionless constant, assigned a generic value of 0.5, Beer's law.
+  real(8)            :: kphio=0.087182   ! Apparent quantum yield efficiency (unitless).
+  real(8)            :: k=0.5            ! dimensionless constant, assigned a generic value of 0.5, Beer's law.
+  real(8)            :: c_molmass =12.0107  ! molecular mass of carbon (g)
 
+  
+  !------------------------------------
   ! Canopy water parameters (Spafhy)
   ! canopy interception
-  real(r8) :: wmax     ! storage capacity for rain (mm/LAI), Hui: this is too much compared to CTSM
-  real(r8) :: wmaxsnow ! storage capacity for snow (mm/LAI), Hui: this is reasonable
+  real(8) :: wmax     ! storage capacity for rain (mm/LAI), Hui: this is too much compared to CTSM
+  real(8) :: wmaxsnow ! storage capacity for snow (mm/LAI), Hui: this is reasonable
 
   ! LAI is annual maximum LAI and for gridded simulations are input from GisData!
   ! keys must be 'LAI_ + key in spec_para
   !real(r8)  :: LAI_conif
   !real(r8)  :: LAI_decid
-  real(r8)  :: hc         ! canopy height (m)
-  real(r8)  :: cf         ! canopy closure fraction (-)
+  real(8)  :: hc         ! canopy height (m)
+  real(8)  :: cf         ! canopy closure fraction (-)
 
   ! canopy conductance                     
   ! real(r8), parameter :: kp =0.6         ! canopy light attenuation parameter (-) Hui: This overlaps with p-hydro
-  real(r8) :: rw         ! critical value for REW (-),
-  real(r8) :: rwmin        ! minimum relative conductance (-)
+  real(8) :: rw         ! critical value for REW (-),
+  real(8) :: rwmin        ! minimum relative conductance (-)
   ! soil evaporation
-  real(r8) :: gsoil              ! soil surface conductance if soil is fully wet (m/s)
+  real(8) :: gsoil              ! soil surface conductance if soil is fully wet (m/s)
 
   ! CFT parameters (not needed in spafhy, replaced by p-hydro)
   ! 'amax': 10.0, # maximum photosynthetic rate (umolm-2(leaf)s-1)
@@ -92,31 +97,16 @@ MODULE readvegpara_mod
   !real(r8) :: sdur= 30.0              ! duration of leaf senescence (days),     
 
   ! degree-day snow model
-  real(r8) :: kmelt         ! melt coefficient in open (mm/s)
-  real(r8) :: kfreeze       ! freezing coefficient (mm/s)
-  real(r8) :: r             ! maximum fraction of liquid in snow (-)
+  real(8) :: kmelt         ! melt coefficient in open (mm/s)
+  real(8) :: kfreeze       ! freezing coefficient (mm/s)
+  real(8) :: r             ! maximum fraction of liquid in snow (-)
 
   ! flow field
-  real(r8) :: zmeas    
-  real(r8) :: zground   
-  real(r8) :: zo_ground 
+  real(8) :: zmeas    
+  real(8) :: zground   
+  real(8) :: zo_ground 
 
-  contains
-
-  subroutine par_init(this)
-
-    class(canopystate_type) :: this
-    type(bounds_type), intent(in) :: bounds  
-
-    call this%InitAllocate(bounds)
-    call this%InitHistory(bounds)
-    call this%InitCold(bounds)
-
-    if ( this%leaf_mr_vcm == spval ) then
-       call endrun(msg="ERROR canopystate Init called before ReadNML"//errmsg(sourcefile, __LINE__))
-    end if
-
-  end subroutine Init
+contains
 
   subroutine readvegpara_namelist
     implicit none
@@ -125,11 +115,9 @@ MODULE readvegpara_mod
     integer :: readerror
     integer,parameter :: unitvegpara=2
 
-    old=.false.
-
     namelist /veg_namelist/ &
-      num_pft,
-      pft_type,
+      num_pft, &
+      pft_type, &
       conductivity, &
       psi50, &
       b, &
@@ -150,7 +138,10 @@ MODULE readvegpara_mod
       zmeas, &
       zground, &
       zo_ground
- 
+     
+     
+    old=.false.
+
     ! Presetting namelist command
     !--- Parameters for P-hydro model
     ! Plant hydraulic parameters
@@ -170,7 +161,7 @@ MODULE readvegpara_mod
     ! Canopy water parameters (Spafhy)
     ! canopy interception
     wmax = 1.5      ! storage capacity for rain (mm/LAI), Hui: this is too much compared to CTSM
-    wmaxsnow = 4.5, ! storage capacity for snow (mm/LAI), Hui: this is reasonable
+    wmaxsnow = 4.5  ! storage capacity for snow (mm/LAI), Hui: this is reasonable
 
     ! LAI is annual maximum LAI and for gridded simulations are input from GisData!
     ! keys must be 'LAI_ + key in spec_para

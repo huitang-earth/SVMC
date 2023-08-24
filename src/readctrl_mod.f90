@@ -22,56 +22,50 @@ MODULE readctrl_mod
 
   implicit none
 
+  public :: readctrl_namelist
+  
   !Input files/settings
 
   integer,parameter :: dp=selected_real_kind(P=15)
   
-  integer :: start_date_day, start_date_hour, time_step, &
+  integer :: start_date_day, start_date_hour, &
              end_date_day, end_date_hour
   integer :: num_sites        ! This can be set by reading input file
   real    :: time_step, time_step_output
-  character(len=256)  :: output_directory, output_filename, input_directory, input_climfile, input_lai
-   
+  character(len=256)  :: output_filename, input_climfile, input_laifile
+
+contains
+  !------------------------------------------------------
   subroutine readctrl_namelist
-
-    use par_mod
-    use com_mod
-    use dust_mod   
-    implicit none
-
     logical :: old
     integer :: readerror
     integer,parameter :: unitcommand=1
 
-    old=.false.
-:
     namelist /ctrl_namelist/ &
     start_date_day, &
     start_date_hour, &
     time_step, &
     end_date_day, &
     end_date_hour, &
-    input_directory, &
     input_climfile, &
     input_laifile, &
     time_step_output, &
-    output_directory, &
     output_filename
+
+    old=.false.
     
     ! Presetting namelist command
     start_date_day  =20210501
     start_date_hour =000000
-    time_step       =0.5               ! hours
+    time_step       =1               ! hours
     end_date_day    =20211001
     end_date_hour   =000000
     num_sites       =1                 ! number of sites, should also be read from input file?
     ! lon_sites     = (/ /)            ! longitude of sites (not needed, can be well defined input file)
     ! lat_sites     = (/ /)            ! latitude of sites (not needed, can be well defined by input file) 
-    input_directory =''
     input_climfile      ='FieldObs_Qvidja.2021.hr.nc'         
     input_laifile       ='FieldObs_Qvidja.2021.lai.nc'
     time_step_output=1.0
-    output_directory='/cluster/work/users/ovewh/'
     output_filename ='test.nc' 
 
     ! Reading namelist

@@ -1,8 +1,12 @@
-MODULE write_output_mod
+MODULE io_mod
+
+  use readctrl_mod
+  use readvegpara_mod
+  use netcdf
 
   implicit none
 
-  contains
+contains
 
   subroutine ncdf_handle_error(status)
     use netcdf    
@@ -17,6 +21,7 @@ MODULE write_output_mod
   subroutine check(status)
     use netcdf
     integer, intent ( in) :: status
+
     !print*, 'Check standard '
     if(status /= nf90_noerr) then 
       print *, trim(nf90_strerror(status))
@@ -24,25 +29,26 @@ MODULE write_output_mod
     end if
   end subroutine check  
 
-  subroutine netCDF_prepareOUTPUT(output_filename, lons, lats, ntim)
+  subroutine netCDF_prepareOUTPUT(filename, lon, lat, ntim)
     !Initialize a netCDF-file for emission fields
     use readctrl_mod
     use netcdf
     implicit none
 
-    character(*) :: input_filename
+    character(*), intent(in) :: filename
     character(80):: str_time
     integer     :: nc_id, status
-    integer :: londim_id, latdim_id, timedim_id,lonvar_id, latvar_id, timevar_id,emitvar_id
-    ! integer :: soil_id, area_id,tot_em_id,time_s_dim_id
-    integer :: soil_id,area_id,clay_id,sand_id,tot_em_id,time_s_dim_id
-    integer :: singdim_id, hourvar_id,dayvar_id
-    !Some vars for standard netcdf example
-    real, dimension(0:nx_lon_out-1) :: lons
-    real, dimension(0:ny_lat_out-1) :: lats
-    !real, dimension( int(releaseDays*24/time_step)) :: dates
+    integer :: londim_id, latdim_id, timedim_id,lonvar_id, latvar_id, timevar_id, &
+               pftdim_id, pftvar_id, gppvar_id, neevar_id, nppvar_id, trvar_id, arvar_id, &
+               hrvar_id, srvar_id, laivar_id, scvar_id, stvar_id, evvar_id, travar_id, &
+               smvar_id, smpvar_id, cyvar_id, abvar_id, tbvar_id, lcvar_id, rcvar_id, fpvar_id
+    integer :: nx_lon=1, ny_lat=1, ntim
 
-    call check(nf90_create(trim(input_filename), cmode = NF90_HDF5, ncid = nc_id) )
+    !Some vars for standard netcdf example
+    real, dimension(1) :: lon
+    real, dimension(1) :: lat
+
+    call check(nf90_create(filename, cmode = NF90_HDF5, ncid = nc_id) )
      
     !Define dimensions
     call check(NF90_DEF_DIM(nc_id, "lon", nx_lon, londim_id))
@@ -67,7 +73,7 @@ MODULE write_output_mod
     call check(nf90_def_var(nc_id, "soil_carbon_content", nf90_float, (/londim_id,latdim_id,timedim_id/), scvar_id))    
     call check(nf90_def_var(nc_id, "stomatal_conductance", nf90_float, (/londim_id,latdim_id,timedim_id/), stvar_id))   
     call check(nf90_def_var(nc_id, "Evap", nf90_float, (/londim_id,latdim_id,timedim_id/), evvar_id))   
-    call check(nf90_def_var(nc_id, "Transp", nf90_float, (/londim_id,latdim_id,timedim_id/), trvar_id))
+    call check(nf90_def_var(nc_id, "Transp", nf90_float, (/londim_id,latdim_id,timedim_id/), travar_id))
     call check(nf90_def_var(nc_id, "SoilMoist", nf90_float, (/londim_id,latdim_id,timedim_id/), smvar_id))
     call check(nf90_def_var(nc_id, "SoilMoistPot", nf90_float, (/londim_id,latdim_id,timedim_id/), smpvar_id))
     call check(nf90_def_var(nc_id, "CropYield", nf90_float, (/londim_id,latdim_id,timedim_id/), cyvar_id))
@@ -128,9 +134,9 @@ MODULE write_output_mod
     call check(NF90_PUT_ATT(nc_id, evvar_id, "units", "kg m-2 s-1"))
     call check(NF90_PUT_ATT(nc_id, evvar_id, "standard_name", "Evaporation"))
     call check(NF90_PUT_ATT(nc_id, evvar_id, "long_name", "Total Evaporation"))
-    call check(NF90_PUT_ATT(nc_id, trvar_id, "units", "kg m-2 s-1"))
-    call check(NF90_PUT_ATT(nc_id, trvar_id, "standard_name", "Transpiration"))
-    call check(NF90_PUT_ATT(nc_id, trvar_id, "long_name", "Total transpiration"))
+    call check(NF90_PUT_ATT(nc_id, travar_id, "units", "kg m-2 s-1"))
+    call check(NF90_PUT_ATT(nc_id, travar_id, "standard_name", "Transpiration"))
+    call check(NF90_PUT_ATT(nc_id, travar_id, "long_name", "Total transpiration"))
     call check(NF90_PUT_ATT(nc_id, smvar_id, "units", "kg m-2"))
     call check(NF90_PUT_ATT(nc_id, smvar_id, "standard_name", "Soil moisture"))
     call check(NF90_PUT_ATT(nc_id, smvar_id, "long_name", "Average Layer Soil Moisture"))
@@ -161,26 +167,25 @@ MODULE write_output_mod
     call check( nf90_enddef(nc_id) )
 
     !Save data to variables
-    call check( nf90_put_var(nc_id, lonvar_id, lons) )
-    call check( nf90_put_var(nc_id, latvar_id, lats) )
-    call check( nf90_put_var(nc_id, timevar_id, time) )
-    call check( nf90_put_var(nc_id, pftvar_id, pftname) )
+    call check( nf90_put_var(nc_id, lonvar_id, lon))
+    call check( nf90_put_var(nc_id, latvar_id, lat))
+    call check( nf90_put_var(nc_id, pftvar_id, pft_type))
 
     print*, "Prepared NetCDF output file"
     call check( nf90_close(nc_id) )
   end subroutine netCDF_prepareOUTPUT
 
-  subroutine netCDF_writeOUTPUT(output_filename, var_name, var_data, time, i)
+  subroutine netCDF_writeOUTPUT(filename, var_name, var_data, time, i)
 
      use netcdf
      implicit none
 
-     character(*) :: output_filename, var_name
+     character(*) :: filename, var_name
      integer :: i, ncid, VarId_date, VarId_var
-     integer, dimension(1) :: time
-     real, dimension(0:nx_lon_out-1, 0:ny_lat_out-1) :: var_data
+     real    :: time
+     real, dimension(1, 1) :: var_data
 
-     call check (nf90_open(output_filename, nf90_Write, ncid))
+     call check (nf90_open(filename, nf90_Write, ncid))
      !Get id number
      call check (nf90_inq_varid(ncid, "time", VarId_date))
      call check (nf90_inq_varid(ncid, var_name, VarId_var))
@@ -190,42 +195,51 @@ MODULE write_output_mod
 
   end subroutine netCDF_writeOUTPUT
 
-  subroutine netCDF_readvar(input_filename, var_name, var_dat, ntim)
-    ! Need to read all the time steps available in the file at once?
-
+  subroutine netCDF_readvar(filename, var_name, var_data, ntim)
+    ! read  one time step in the file at once?
     use netcdf
     implicit none
 
-    character(*) :: input_filename, var_name
-    integer :: i, ncid, VarId_date, VarId_var
-    integer, dimension(0) :: time
-    real, dimension(0:nx_lon_out-1, 0:ny_lat_out-1), intent (out) :: var_data
+    character(*), intent(in) :: filename, var_name
+    integer, intent(in)      :: ntim
+    real,dimension(:,:,:), intent (out)       :: var_data
 
-    call check (nf90_open(input_filename, nf90_nowrite, ncid))
+    integer      :: i, ncid, varid, ndimsi
+    character    :: var_name_tmp
+    character    :: dim_name_tmp(4)
+    integer      :: xtype
+    integer      :: dimids(4)                     ! netCDF dimension ids
+    integer      :: bego(4),leno(4)               ! netCDF bounds
+    integer      :: begi(4),leni(4)               ! netCDF bounds 
+    
+
+    call check (nf90_open(filename, nf90_nowrite, ncid))
     !Get id number
     call check (nf90_inq_varid(ncid, var_name, varid))
-    !Get dimension id of variables
-    call check (nf90_inq_vardimid(ncidi, varid, dimids))
-    !Get dimension number of variables 
-    call check (nf90_inq_varndims(ncidi, varid, ndimsi))
+    !Get dimension id of variables, Get dimension number of variables 
+    !call check (nf90_inq_vardimid(ncid, varid, dimids))
+    !call check (nf90_inq_varndims(ncid, varid, ndimsi))
+    call check (nf90_inquire_variable(ncid, varid, var_name_tmp, xtype, ndimsi, dimids))
+
     ! Get the length of each dimension
     ! the order of dimension: lon, lat, lev, time
     ! Assuming reading whole lon, lat, lev and time range?
+
     if (ndimsi ==4) then
       begi(1) = 1
       begi(2) = 1
       begi(3) = 1
       begi(4) = ntim
-      call check (nf90_inq_dimlen(ncidi, dimids(1), leni(1)))
-      call check (nf90_inq_dimlen(ncidi, dimids(2), leni(2)))
-      call check (nf90_inq_dimlen(ncidi, dimids(3), leni(3)))
+      call check (nf90_inquire_dimension(ncid, dimids(1), dim_name_tmp(1), leni(1)))
+      call check (nf90_inquire_dimension(ncid, dimids(2), dim_name_tmp(2), leni(2)))
+      call check (nf90_inquire_dimension(ncid, dimids(3), dim_name_tmp(3), leni(3)))
       leni(4) = 1
     else if (ndimsi== 3) then
       begi(1) = 1
       begi(2) = 1
       begi(3) = ntim
-      call check (nf90_inq_dimlen(ncidi, dimids(1), leni(1)))
-      call check (nf90_inq_dimlen(ncidi, dimids(2), leni(2)))
+      call check (nf90_inquire_dimension(ncid, dimids(1), dim_name_tmp(1), leni(1)))
+      call check (nf90_inquire_dimension(ncid, dimids(2), dim_name_tmp(2), leni(2)))
       leni(3) = 1
     end if
 
@@ -234,69 +248,89 @@ MODULE write_output_mod
       !if (ndimsi == 3) begi(3)=m
         
     ! Get values of variables
-    call check(nf90_get_var (ncidi, varid, var_data, begi(1:ndimsi), leni(1:ndimsi)))
+    call check (nf90_get_var(ncid, varid, var_data, start=begi(1:ndimsi), count=leni(1:ndimsi)))
 
     ! Close netcdf file
     call check( nf90_close(ncid))
 
   end subroutine netCDF_readvar
 
-  subroutine netCDF_readTime(input_filename, ntim, start_input_time, end_input_time)
+  subroutine netCDF_readTime(filename, ntim, start_input_time, end_input_time)
     ! Read time info included in netcdf file
 
-    call check (nf90_open(input_filename, nf90_nowrite, ncid))
+    use netcdf
+    implicit none
+
+    character(*), intent(in) :: filename
+    integer, intent(out)     :: ntim
+    real(8), dimension(1), intent(out)     :: start_input_time, end_input_time
+ 
+    integer  :: ncid, dimid, varid
+    character :: dim_name_tmp
+
+    call check (nf90_open(filename, nf90_nowrite, ncid))
     ! Get time dimension id number
-    call check (nf90_inq_dimid(ncidi, 'time', dimid))
+    call check (nf90_inq_dimid(ncid, 'time', dimid))
     ! Get time dimension length 
-    call check (nf909_inq_dimlen(ncidi, dimid, ntim))
+    call check (nf90_inquire_dimension(ncid, dimid, dim_name_tmp, ntim))
 
     ! Get values of variables
     call check (nf90_inq_varid(ncid, 'time', varid))
-    call check (nf90_get_var (ncidi, varid, start_input_time, 1, 1))
-    call check (nf90_get_var (ncidi, varid, end_input_time, ntim, 1))
+    call check (nf90_get_var(ncid, varid, start_input_time, start=(/1/), count=(/1/)))
+    call check (nf90_get_var(ncid, varid, end_input_time, start=(/ntim/), count=(/1/)))
 
     ! Close netcdf file
     call check( nf90_close(ncid))
 
   end subroutine
 
-  subroutine netCDF_readClim(input_filename,temp, ppfd, prec, sh, rh, vpd, pres, co2, i)
+  subroutine netCDF_readClim(filename,temp, ppfd, prec, sh, rh, vpd, pres, co2, i)
     ! Read meteorological forcing variables
     ! temp.... other forcing variables need to be defined
-    ! start_input_time, end_input_time need to be set
-
+  
     use netcdf
     implicit none
 
-    character(*) :: input_filename, var_name
-    integer :: i, ncid, VarId_date, VarId_var
-    integer, dimension(0) :: time
-    real, dimension(0:nx_lon_out-1, 0:ny_lat_out-1), intent (out) :: var_data
-    real, intent (out) :: start_input_time, end_input_time
+    character(*), intent(in) :: filename
+    integer, intent(in)      :: i
+    real,dimension(:,:,:), intent(out) :: temp, ppfd, prec, sh, rh, vpd, pres, co2
 
-    call netCDF_readvar(input_filename, "air_temperature", temp, i)
-    call netCDF_readvar(input_filename, "surface_downwelling_photosynthetic_photon_flux_in_air", ppfd,i)
-    call netCDF_readvar(input_filename, "precipitation_flux", prec, i)
-    call netCDF_readvar(input_filename, "specific_humidity", sh, i)
-    call netCDF_readvar(input_filename, "relative_humidity", rh, i)
-    call netCDF_readvar(input_filename, "water_vapor_saturation_deficit", vpd, i)
-    call netCDF_readvar(input_filename, "air_pressure", pres, i)
-    call netCDF_readvar(input_filename, "mole_fraction_of_carbon_dioxide_in_air", co2, i)
+    call netCDF_readvar(filename, "air_temperature", temp, i)
+    call netCDF_readvar(filename, "surface_downwelling_photosynthetic_photon_flux_in_air", ppfd,i)
+    call netCDF_readvar(filename, "precipitation_flux", prec, i)
+    call netCDF_readvar(filename, "specific_humidity", sh, i)
+    call netCDF_readvar(filename, "relative_humidity", rh, i)
+    call netCDF_readvar(filename, "water_vapor_saturation_deficit", vpd, i)
+    call netCDF_readvar(filename, "air_pressure", pres, i)
+    call netCDF_readvar(filename, "mole_fraction_of_carbon_dioxide_in_air", co2, i)
     
   end subroutine netCDF_readClim 
 
-  subroutine netCDF_readlai(input_filename, lai, i)
+  subroutine netCDF_readlai(filename, lai, i)
 
      use netcdf
      implicit none
 
-     character(*) :: input_filename, var_name
-     integer :: i, ncid, VarId_date, VarId_var
-     integer, dimension(0) :: time
-     real, dimension(0:nx_lon_out-1, 0:ny_lat_out-1), intent (out) :: var_data
+     character(*), intent(in) :: filename
+     integer, intent(in)      :: i
+     real, dimension(:,:,:), intent (out)       :: lai
 
-     call netCDF_readvar(input_filename, "LAI", lai, i)
+     call netCDF_readvar(filename, "LAI", lai, i)
 
   end subroutine netCDF_readlai
 
-end module write_output_mod
+  subroutine netCDF_readsoilmoist(filename, soilmoist, i)
+
+     use netcdf
+     implicit none
+
+
+     character(*), intent(in) :: filename
+     integer, intent(in)      :: i
+     real, dimension(:,:,:), intent (out)       :: soilmoist
+
+     call netCDF_readvar(filename, "SoilMoist", soilmoist, i)
+
+  end subroutine netCDF_readsoilmoist
+
+end module io_mod
