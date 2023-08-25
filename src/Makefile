@@ -17,7 +17,7 @@ LIBPATH1 = /usr/local/lib
 
 LIBS = -lnetcdff -DUSE_NCF
 
-FFLAGS   = -I$(INCPATH1) -O2 -g -cpp -m64 -lnetcdff -lnetcdf -L$(LIBPATH1) -DUSE_NCF
+FFLAGS   = -I$(INCPATH1) -O2 -g -cpp -m64 -lnetcdff -lnetcdf -L$(LIBPATH1) -DUSE_NCF -fcheck='bounds' 
 #FFLAGS   =   -I$(INCPATH1) -I$(INCPATH_NCDF) -g  -fbacktrace -mcmodel=medium -fbounds-check -Wall -Wextra -Warray-temporaries -Wconversion -fimplicit-none -fbacktrace -ffree-line-length-0 -fcheck=all -ffpe-trap=zero,overflow,underflow -finit-real=nan
 LDFLAGS  = $(FFLAGS)  -L$(LIBPATH1) $(LIBS)  #-Wl,-rpath,$(LIBPATH1) $(LIBPATH2) $(LIBS) 
 #LDFLAGS  = $(FFLAGS)  -L$(LIBPATH1) -lgrib_api_f90 -lgrib_api -lm -ljasper -lnetcdff
@@ -28,15 +28,16 @@ MODOBJS = \
 readctrl_mod.o   \
 readvegpara_mod.o \
 io_mod.o   \
-phydro_mod.o
-
-OBJECTS = \
-SVMC.o  \
-lbfgsb.o \
+timer.o \
 blas.o   \
 linpack.o \
-timer.o  \
+lbfgsb.o \
+phydro_mod.o \
 juldate.o
+
+OBJECTS = \
+SVMC.o
+
 
 
 
