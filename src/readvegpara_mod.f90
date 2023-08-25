@@ -20,8 +20,8 @@ MODULE readvegpara_mod
     real(8) :: gamma    !cost of hydraulic repair
   end type par_cost_type
 
-  character(len=256), public  :: opt_hypothesis        ! character, Either "Lc" or "PM"       num_pft, &
-  integer  :: pft_type, num_pft
+  character(len=256), public  :: opt_hypothesis, pft_type        ! character, Either "Lc" or "PM"
+  integer  :: num_pft
   real(8)  :: conductivity, psi50, b, alpha, gamma
 
   type, public :: par_env_type
@@ -141,7 +141,9 @@ contains
      
      
     old=.false.
-
+    num_pft=1
+    pft_type="grass"
+    
     ! Presetting namelist command
     !--- Parameters for P-hydro model
     ! Plant hydraulic parameters
@@ -187,13 +189,13 @@ contains
     zo_ground = 0.01 
   
     ! Reading namelist
-    open(unitvegpara, file='./veg_namelist', status='old', form='formatted', err=999)
-    read(unitvegpara,veg_namelist,iostat=readerror)
-    close(unitvegpara)
+   ! open(unitvegpara, file='./veg_namelist', status='old', form='formatted', err=999)
+    !read(unitvegpara,veg_namelist,iostat=readerror)
+    !close(unitvegpara)
 
-999   write(*,*) ' #### MODEL ERROR! FILE "veg_namelist"    #### '
-    write(*,*) ' #### CANNOT BE OPENED IN THE DIRECTORY       #### '
-    stop
+!999   write(*,*) ' #### MODEL ERROR! FILE "veg_namelist"    #### '
+!    write(*,*) ' #### CANNOT BE OPENED IN THE DIRECTORY       #### '
+!    stop
 
   end subroutine readvegpara_namelist
 

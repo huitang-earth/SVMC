@@ -30,9 +30,10 @@ MODULE readctrl_mod
   
   integer :: start_date_day, start_date_hour, &
              end_date_day, end_date_hour
-  integer :: num_sites        ! This can be set by reading input file
+  integer :: num_sites              ! This can be set by reading input file
+  real(8), dimension(1)    :: lat_sites, lon_sites   ! This can be set by reading input file 
   real    :: time_step, time_step_output
-  character(len=256)  :: output_filename, input_climfile, input_laifile
+  character(len=256)  :: output_filename, output_filename_hr, input_climfile, input_laifile
 
 contains
   !------------------------------------------------------
@@ -47,6 +48,7 @@ contains
     time_step, &
     end_date_day, &
     end_date_hour, &
+    num_sites, & 
     input_climfile, &
     input_laifile, &
     time_step_output, &
@@ -63,15 +65,16 @@ contains
     num_sites       =1                 ! number of sites, should also be read from input file?
     ! lon_sites     = (/ /)            ! longitude of sites (not needed, can be well defined input file)
     ! lat_sites     = (/ /)            ! latitude of sites (not needed, can be well defined by input file) 
-    input_climfile      ='FieldObs_Qvidja.2021.hr.nc'         
-    input_laifile       ='FieldObs_Qvidja.2021.lai.nc'
+    input_climfile      ='../data/FieldObs_Qvidja.2021.hr.nc'         
+    input_laifile       ='../data/FieldObs_Qvidja.2021.lai.nc'
     time_step_output=1.0
-    output_filename ='test.nc' 
+    output_filename ='../data/test.nc' 
+    output_filename_hr ='../data/test_hr.nc' 
 
     ! Reading namelist
-    open(unitcommand, file='./ctrl_namelist', status='old', form='formatted', err=999)
-    read(unitcommand, ctrl_namelist, iostat=readerror)
-    close(unitcommand)
+    !open(unitcommand, file='./ctrl_namelist', status='old', form='formatted', err=999)
+    !read(unitcommand, ctrl_namelist, iostat=readerror)
+    !close(unitcommand)
 
     if (time_step.eq.0) then
       write(*,*) ' #### MODEL ERROR! TIME STEP MUST    #### '
@@ -82,9 +85,9 @@ contains
 
     return
 
-999   write(*,*) ' #### MODEL ERROR! FILE "ctrl_namelist"    #### '
-    write(*,*) ' #### CANNOT BE OPENED IN THE DIRECTORY       #### '
-    stop
+!999   write(*,*) ' #### MODEL ERROR! FILE "ctrl_namelist"    #### '
+!    write(*,*) ' #### CANNOT BE OPENED IN THE DIRECTORY       #### '
+!    stop
 
   end subroutine readctrl_namelist
                    
