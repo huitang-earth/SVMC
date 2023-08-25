@@ -45,8 +45,8 @@ contains
     integer :: nx_lon=1, ny_lat=1, ntim
 
     !Some vars for standard netcdf example
-    real, dimension(1) :: lon
-    real, dimension(1) :: lat
+    real(8), dimension(1) :: lon
+    real(8), dimension(1) :: lat
 
     call check(nf90_create(filename, cmode = NF90_HDF5, ncid = nc_id) )
      
@@ -175,6 +175,7 @@ contains
     call check( nf90_close(nc_id) )
   end subroutine netCDF_prepareOUTPUT
 
+
   subroutine netCDF_writeOUTPUT(filename, var_name, var_data, time, i)
 
      use netcdf
@@ -182,8 +183,8 @@ contains
 
      character(*) :: filename, var_name
      integer :: i, ncid, VarId_date, VarId_var
-     real    :: time
-     real, dimension(1, 1) :: var_data
+     real(8)    :: time
+     real(8), dimension(:,:,:) :: var_data
 
      call check (nf90_open(filename, nf90_Write, ncid))
      !Get id number
@@ -195,6 +196,7 @@ contains
 
   end subroutine netCDF_writeOUTPUT
 
+
   subroutine netCDF_readvar(filename, var_name, var_data, ntim)
     ! read  one time step in the file at once?
     use netcdf
@@ -202,7 +204,7 @@ contains
 
     character(*), intent(in) :: filename, var_name
     integer, intent(in)      :: ntim
-    real,dimension(:,:,:), intent (out)       :: var_data
+    real(8),dimension(:,:,:), intent (out)       :: var_data
 
     integer      :: i, ncid, varid, ndimsi
     character    :: var_name_tmp
@@ -255,6 +257,7 @@ contains
 
   end subroutine netCDF_readvar
 
+
   subroutine netCDF_readTime(filename, ntim, start_input_time, end_input_time)
     ! Read time info included in netcdf file
 
@@ -284,6 +287,38 @@ contains
 
   end subroutine
 
+ 
+  subroutine netCDF_readlonlat(filename, nsites, lat, lon)
+    ! Read time info included in netcdf file
+
+    use netcdf
+    implicit none
+
+    character(*), intent(in) :: filename
+    integer, intent(out)     :: nsites
+    real(8), dimension(:), intent(out)     :: lat, lon
+ 
+    integer  :: ncid, dimid, varid1,varid2
+    character :: dim_name_tmp
+
+    call check (nf90_open(filename, nf90_nowrite, ncid))
+    ! Get time dimension id number
+    call check (nf90_inq_dimid(ncid, 'latitude', dimid))
+    ! Get time dimension length 
+    call check (nf90_inquire_dimension(ncid, dimid, dim_name_tmp, nsites))
+
+    ! Get values of variables
+    call check (nf90_inq_varid(ncid, 'latitude', varid1))
+    call check (nf90_inq_varid(ncid, 'longitude', varid2))
+    call check (nf90_get_var(ncid, varid1, lat, start=(/1/), count=(/nsites/)))
+    call check (nf90_get_var(ncid, varid2, lon, start=(/1/), count=(/nsites/)))
+
+    ! Close netcdf file
+    call check( nf90_close(ncid))
+
+  end subroutine
+  
+
   subroutine netCDF_readClim(filename,temp, ppfd, prec, sh, rh, vpd, pres, co2, i)
     ! Read meteorological forcing variables
     ! temp.... other forcing variables need to be defined
@@ -293,7 +328,7 @@ contains
 
     character(*), intent(in) :: filename
     integer, intent(in)      :: i
-    real,dimension(:,:,:), intent(out) :: temp, ppfd, prec, sh, rh, vpd, pres, co2
+    real(8),dimension(:,:,:), intent(out) :: temp, ppfd, prec, sh, rh, vpd, pres, co2
 
     call netCDF_readvar(filename, "air_temperature", temp, i)
     call netCDF_readvar(filename, "surface_downwelling_photosynthetic_photon_flux_in_air", ppfd,i)
@@ -313,7 +348,7 @@ contains
 
      character(*), intent(in) :: filename
      integer, intent(in)      :: i
-     real, dimension(:,:,:), intent (out)       :: lai
+     real(8), dimension(:,:,:), intent (out)       :: lai
 
      call netCDF_readvar(filename, "LAI", lai, i)
 
@@ -327,7 +362,7 @@ contains
 
      character(*), intent(in) :: filename
      integer, intent(in)      :: i
-     real, dimension(:,:,:), intent (out)       :: soilmoist
+     real(8), dimension(:,:,:), intent (out)       :: soilmoist
 
      call netCDF_readvar(filename, "SoilMoist", soilmoist, i)
 
