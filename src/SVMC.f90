@@ -34,37 +34,72 @@ program SVMC
 
   ! Loop variables
   !***********************************
-  integer         :: i, j, k, t
+  integer         :: i, m
   integer         :: step_nc_hr, step_nc_day, step_clim, step_lai
   real(kind=dp)   :: tot_hour, tot_hour_end, juldate, start_date, end_date
-  real            :: start_clim_time, end_clim_time 
-  real            :: start_lai_time, end_lai_time
-  
-  integer         :: ntim_clim, ntim_lai, ntim_out_hr, ntime_out_day
+  real(8), dimension(1)     :: start_clim_time, end_clim_time
+  real(8)            :: start_clim_juldate,start_lai_juldate    
+  real(8), dimension(1)    :: start_lai_time, end_lai_time 
+  integer         :: ntim_clim, ntim_lai, ntim_out_hr, ntim_out_day
  
   !***********************************
   !Model variables
   !***********************************
-  integer   ::
 
+
+  ! p-hydro variabless
   ! Input variables for p-hydro (the definition is from rpmodel.R)
-  real     ::    tc        ! Air temperature (tc), degrees C
-  real     ::    ppfd      ! Photosynthetic photon flux density (mol m-2 d-1) (incoming solar radiation from forcing data?)
-  real     ::    vpd       ! Vapour pressure deficit (Pa) (will be calculated using pressure & humidity)
-  real     ::    co2       ! Atmospheric CO2 concentration (ppm)
-  real     ::    elv       ! Elevation above sea-level (m.a.s.l.) (not needed if we have surface pressure!)
-  real     ::    fapar     ! Fraction of absorbed photosynthetically active radiation (unitless) (will be calculated using LAI)
-  real     ::    kphio     ! Apparent quantum yield efficiency (unitless).
-  real     ::    psi_soil  ! soil water potential (Mpa)
-  real     ::    rdark     !
-  character(len=200)            :: opt_hypothesis   ! character, Either "Lc" or "PM"
+  real(8)     ::    temp        ! Air temperature (tc), degrees C
+  real(8)     ::    ppfd      ! Photosynthetic photon flux density (mol m-2 d-1) (incoming solar radiation from forcing data?)
+  real(8)     ::    vpd       ! Vapour pressure deficit (Pa) (will be calculated using pressure & humidity)
+  real(8)     ::    co2       ! Atmospheric CO2 concentration (ppm)
+  real(8)     ::    elv       ! Elevation above sea-level (m.a.s.l.) (not needed if we have surface pressure!)
+  real(8)     ::    fapar     ! Fraction of absorbed photosynthetically active radiation (unitless) (will be calculated using LAI)
+  real(8)     ::    prec      ! 
+  real(8)     ::    pres
+  real(8)     ::    sh
+  real(8)     ::    rh
+  real(8)     ::    psi_soil  ! soil water potential (Mpa)
+  real(8)     ::    soilmoist
+  real(8)     ::    rdark     
+
+  real(8), dimension(1,1,1)  :: lai_matrix, soilmoist_matrix
+  real(8), dimension(1,1,1)  :: temp_matrix, ppfd_matrix, prec_matrix, &
+                                sh_matrix, rh_matrix, vpd_matrix, &
+                                pres_matrix, co2_matrix, gpp_matrix
+
+  real(8)     ::    lai
+
+  real(8)    :: jmax       !  The maximum rate of RuBP regeneration (umol/m2/s) at growth temperature (argument\code{tc}), calculated using
+                                                ! \deqn{A_J = A_C} 
+                                                !  Electron transport capacity (umol/m2/s)
+  real(8)    :: dpsi       ! soil-to-leaf water potential difference (\eqn{\psi_s-\psi_l}), Mpa
+  real(8)    :: gs         ! Stomatal conductance (gs, in mol C m-2 Pa-1), calculated as
+  real(8)    :: aj        ! electron-transport limited assimilation rate (umol/m2/s)
+  real(8)    :: ci         !  leaf-internal CO2 concentration, converted to partial pressure (Pa)
+  real(8)    :: chi        ! Optimal ratio of leaf internal to ambient CO2 (unitless).
+  real(8)    :: vcmax      !   Carboxylation capacity (umol/m2/s)
+  real(8)    :: profit                  ! Net assimilation rate after accounting for costs
+  real(8)    :: chi_jmax_lim      ! Analytical chi in the case of strong Jmax limitation
+
+  ! spafhy variables
+  real(8) :: watsat      ! v/v saturate moisture
+  real(8) :: watres      ! v/v, residual soil moisture for Van Genuchten
+  real(8) :: vol_ice     ! v/v, volumetric ice in soil bucket 
+  real(8) :: vol_liq     ! v/v, volumetric of liq in soil bucket     
+  real(8) :: satfrac     ! parameter for Van Genuchten
+  real(8) :: n1, m1           ! (-), pore-size-distribution parameter for Van Genuchten 1.07
+  real(8) :: eff_porosity! v/v, volume of ice
 
   type(par_plant_type)          :: par_plant           ! A list of plant hydraulic parameters (will be defined in readpara_mod.f90).
   type(par_cost_type)           :: par_cost            ! A list of cost parameters (will be defined in readpara_mod.f90).
 
-  character(len=200)  ::
-  real,dimension(:,:), allocatable
-  logical,dimension(:,:), allocatable ::
+  ! Output variables
+  real(8)    :: gpp
+
+  !character(len=200)  ::
+  !real,dimension(:,:), allocatable
+  !logical,dimension(:,:), allocatable ::
   !*********************************** 
  
   ! Initialize the model, including
@@ -79,29 +114,34 @@ program SVMC
   ! call initialization
    
   ! psi_soil=0
-
+  call readctrl_namelist
+  call readvegpara_namelist
 
   !***********************************
   ! Set time control parameters
   !***********************************
   
+  print *, start_date_day
+
   start_date=juldate(start_date_day, start_date_hour)
   end_date  =juldate(end_date_day, end_date_hour)
  
   ! Calculate total hours of the simulation
-  tot_hour_end= (juldate(start_date_day, start_date_hour) - juldate(end_date_day, end_date_hour))*24  
+  tot_hour_end= (juldate(end_date_day, end_date_hour) - juldate(start_date_day, start_date_hour))*24  
   ntim_out_hr = mod(tot_hour_end, time_step_output)
-  ntim_out_day= mod(tot_hour_end, 24)
+  ntim_out_day= mod(tot_hour_end, 24.0)
 
   ! Run the model
   tot_hour=0.0
   step_nc_hr=0
   step_nc_day=0
 
+  print *, tot_hour_end
   ! Read time series of input data
   call netCDF_readTime(input_climfile, ntim_clim, start_clim_time, end_clim_time)
   call netCDF_readTime(input_laifile, ntim_lai, start_lai_time, end_lai_time)
-  
+  call netCDF_readlonlat(input_climfile, num_sites, lat_sites, lon_sites)
+
   ! To simplify the time management, specify the julian start date of the inputdata by hand.
   start_clim_juldate=juldate(20201231,233000)
   start_lai_juldate =juldate(20210101,000000)
@@ -109,7 +149,8 @@ program SVMC
   ! step the starting time steps for reading input files
   step_clim = floor((start_date-start_clim_juldate)*24)+1
   step_lai  = floor(start_date-start_lai_juldate)+1
-   
+
+  print *, num_sites, lat_sites, lon_sites, tot_hour, num_pft   
   ! Loop over time, and locations
   do while (tot_hour .le. tot_hour_end)  ! in hour or 30 minutes, time loop 
     
@@ -126,43 +167,59 @@ program SVMC
 
           ! Determine whether to read new lai data
           ! Only update LAI daily
-          if (mod(tot_hour,24) .eq. 0) then
-            call netCDF_readlai(input_laifile, lai, step_lai)
-            call netCDF_readsoilmoist('../data/FieldObs_Qvidja.2021.soilmoist.nc', soilmoist, step_lai)
+
+          if (mod(tot_hour,24.0) .eq. 0) then
+            call netCDF_readlai(input_laifile, lai_matrix, step_lai)
+            call netCDF_readsoilmoist('../data/FieldObs_Qvidja.2021.soilmoist.nc', soilmoist_matrix, step_lai)
             
+            lai=lai_matrix(1,1,1)
+            soilmoist=soilmoist_matrix(1,1,1) 
+            ! add soil rentention curve here to test soil water potential calculation
             n1=1.07       !Launiainen et al. 2022: C1-5: 1.12, 1.14, 1.07, 1.27, 1.18  
-            m1=1._r8/n  
+            m1=1.0/n1  
             watres=0.0   !Launiainen et al. 2022: C1-5: 0.0
             alpha=2.02   !Launiainen et al. 2022: C1-5: 4.45, 5.92, 2.02, 4.49, 3.35
             watsat=0.46  !Launiainen et al. 2022: C1-5: 0.75, 0.68, 0.46, 0.47, 0.54  
 
-            vol_ice = 0.0_r8   
-            eff_porosity = max(0.01_r8, watsat-vol_ice)
+            vol_ice = 0.0   
+            eff_porosity = max(0.01, watsat-vol_ice)
     
             satfrac  = (vol_liq-watres)/(eff_porosity-watres)
-            psi_soil = -(1._r8/alpha)*(satfrac**(1._r8/(m1-1._r8)) - 1._r8 )**m1
+            psi_soil = -(1.0/alpha)*(satfrac**(1.0/(m1-1.0)) - 1.0 )**m1
 
+            ! calculate fapar:
             step_lai=step_lai+1
-            fapar= 1-exp(-k*LAI)
+            fapar= 1-exp(-k*lai)
           end if
 
           ! Determine whether to read new climate variables
           ! if () then
-          call netCDF_readClim(input_climfile, temp, ppfd, prec, sh, rh, vpd, pres, co2, step_clim)
+          call netCDF_readClim(input_climfile, temp_matrix, ppfd_matrix, prec_matrix, &
+                       sh_matrix, rh_matrix, vpd_matrix, pres_matrix, &
+                       co2_matrix, step_clim)
+
+          temp=temp_matrix(1,1,1)
+          ppfd=ppfd_matrix(1,1,1)
+          prec=prec_matrix(1,1,1)
+          sh=sh_matrix(1,1,1)
+          rh=rh_matrix(1,1,1)
+          vpd=vpd_matrix(1,1,1)
+          pres=pres_matrix(1,1,1)
+          co2=co2_matrix(1,1,1) 
+          
           step_clim=step_clim+1
           ! end if
 
           ! run phydro to estimate photosynthetic rate (a) and stomatal conductance (gs)
           ! At what time scale the optimization should work need to be tested!!!!
           
+          rdark=0.0
           call pmodel_hydraulics_numerical(temp-273.15, ppfd*3600*24, vpd, co2*1000000, pres, fapar, &
-                                 kphio, psi_soil, 0,                                                 &
-                                 conductivity, psi50, b, alpha, gamma,                               &
-                                 opt_hypothesis = "PM",                                              &
+                                 psi_soil, rdark,                                                 &
                                  jmax, dpsi, gs, aj, ci, chi, vcmax, profit, chi_jmax_lim            &
                                  )
           
-          gpp= aj * c_molmass 
+          gpp= aj * c_molmass * lai
           ! Carbon allocation: update gpp, npp, ar ....
           ! call carbon_allocation_hr(a,....)          
         
@@ -179,7 +236,7 @@ program SVMC
 
         ! Write hourly output at output time step frequency
 
-        if ( mod((tot_hour,time_step_output).eq.0. ) then
+        if ( mod(tot_hour,time_step_output) .eq. 0.0 ) then
             
           !Write hourly output for this time step
           !************************************************************************
@@ -188,7 +245,8 @@ program SVMC
             call netCDF_prepareOUTPUT(output_filename_hr, lon_sites, lat_sites, ntim_out_hr)
           end if
 
-          call netCDF_writeOUTPUT(output_filename_hr, "GPP", gpp, tot_hour/24, step_nc_hr)
+          gpp_matrix(1,1,1)=gpp
+          call netCDF_writeOUTPUT(output_filename_hr, "GPP", gpp_matrix, tot_hour/24.0, step_nc_hr)
           !call netCDF_writeOUTPUT(output_filename_hr, "Evap", tot_evap, tot_hour/24, step_nc_hr)
           !call netCDF_writeOUTPUT(output_filename_hr, "Transp", tr, tot_hour/24, step_nc_hr)
           !call netCDF_writeOUTPUT(output_filename_hr, "SoilMoist", soilwater_state%WatSto, tot_hour/24, step_nc_hr)
