@@ -37,16 +37,23 @@ contains
 
     character(*), intent(in) :: filename
     character(80):: str_time
+    character    :: adate*8,atime*6,timeunit*32
     integer     :: nc_id, status
     integer :: londim_id, latdim_id, timedim_id,lonvar_id, latvar_id, timevar_id, &
                pftdim_id, pftvar_id, gppvar_id, neevar_id, nppvar_id, trvar_id, arvar_id, &
                hrvar_id, srvar_id, laivar_id, scvar_id, stvar_id, evvar_id, travar_id, &
-               smvar_id, smpvar_id, cyvar_id, abvar_id, tbvar_id, lcvar_id, rcvar_id, fpvar_id
+               smvar_id, smpvar_id, cyvar_id, abvar_id, tbvar_id, lcvar_id, rcvar_id, fpvar_id, &
+               namedim_id
     integer :: nx_lon=1, ny_lat=1, ntim
+    integer :: yyyy,mm,dd,hh,mi,ss
 
     !Some vars for standard netcdf example
     real(8), dimension(1) :: lon
     real(8), dimension(1) :: lat
+
+    write(adate,'(i8.8)') start_date_day
+    write(atime,'(i6.6)') start_date_hour
+
 
     call check(nf90_create(filename, cmode = NF90_HDF5, ncid = nc_id) )
      
@@ -55,13 +62,14 @@ contains
     call check(NF90_DEF_DIM(nc_id, "lat", ny_lat, latdim_id))
     call check(NF90_DEF_DIM(nc_id, "time", ntim, timedim_id))
     call check(NF90_DEF_DIM(nc_id, "pft", num_pft, pftdim_id))
+    call check(NF90_DEF_DIM(nc_id, "namelen", 20, namedim_id))
 
     !Define variables
     !   status=NF90_DEF_VAR(nc_id,"lon",NF90_FLOAT, (/ londim_id /), lonvar_id)
     call check(nf90_def_var(nc_id, "lon", nf90_float, (/ londim_id /), lonvar_id))
     call check(nf90_def_var(nc_id, "lat", nf90_float, (/ latdim_id /), latvar_id))
-    call check(nf90_def_var(nc_id, "time", nf90_int, (/timedim_id/), timevar_id))
-    call check(nf90_def_var(nc_id, "pftname", nf90_char, (/pftdim_id/), pftvar_id))
+    call check(nf90_def_var(nc_id, "time", nf90_float, (/timedim_id/), timevar_id))
+    call check(nf90_def_var(nc_id, "pftname", nf90_char, (/namedim_id, pftdim_id/), pftvar_id))
     call check(nf90_def_var(nc_id, "GPP", nf90_float, (/londim_id,latdim_id,timedim_id/), gppvar_id))
     call check(nf90_def_var(nc_id, "NEE", nf90_float, (/londim_id,latdim_id,timedim_id/), neevar_id))
     call check(nf90_def_var(nc_id, "NPP", nf90_float, (/londim_id,latdim_id,timedim_id/), nppvar_id))
@@ -91,7 +99,12 @@ contains
     call check(NF90_PUT_ATT(nc_id, latvar_id, "standard_name", "latitude"))
     call check(NF90_PUT_ATT(nc_id, latvar_id, "long_name", "Latitude"))
     
-    write(str_time, *) "days since ", start_date_day,"-",start_date_hour," UTC"
+    !write(str_time, *) "days since ", yyyy,"-",mm,"-",dd," ",hh,":",mi,":",ss
+    !print *, str_time
+    str_time = 'days since '//adate(1:4)//'-'//adate(5:6)// &
+     '-'//adate(7:8)//' '//atime(1:2)//':'//atime(3:4)//':'//atime(5:6)
+    print *, str_time
+
     call check(NF90_PUT_ATT(nc_id, timevar_id, "units", trim(str_time)))
     call check(NF90_PUT_ATT(nc_id, timevar_id, "standard_name", "time"))
     call check(NF90_PUT_ATT(nc_id, timevar_id, "long_name", "Time middle averaging period"))
@@ -167,9 +180,12 @@ contains
     call check( nf90_enddef(nc_id) )
 
     !Save data to variables
+    !print *, "lon=", lon
     call check( nf90_put_var(nc_id, lonvar_id, lon))
+    !print *, "lat=", lat
     call check( nf90_put_var(nc_id, latvar_id, lat))
-    call check( nf90_put_var(nc_id, pftvar_id, pft_type))
+    !print *, "pft=", pft_type
+    call check( nf90_put_var(nc_id, pftvar_id, trim(pft_type),(/1,1/)))
 
     print*, "Prepared NetCDF output file"
     call check( nf90_close(nc_id) )
