@@ -88,6 +88,7 @@ contains
     par_plant%conductivity=conductivity
     par_plant%psi50       =psi50
     par_plant%b           =b
+    print *, "alpha=", alpha
     par_cost%alpha        =alpha
     par_cost%gamma        =gamma
   
@@ -162,19 +163,21 @@ contains
                                                              ! "PM": Profit Maximisation (see: rpmodel_hydraulics_numerical.R)  
     
     ! local variables:
-    real(8), dimension(1:2)            :: x, l, u, grad
+    type(optimizer_type)                :: delta1_lj_dps, delta2_lj_dps
+    real(8), dimension(1:2)             :: x, l, u, grad 
     integer,  dimension(1:2)            :: nbd
     logical,  dimension(1:4)            :: lsave
-    integer                             :: n, m, nmax, mmax, nwa, iwa, iprint, icsave, &
-                                           isave(44), dsave(29), iter, maxIterations
-    real(8)                             :: profit, factr, pgtol
-    character(len=60)                   :: task
-    real(8), dimension(:), allocatable :: wa
+    integer                             :: n, m, nmax, mmax, nwa, iprint,  &
+                                           isave(44), iter, maxIterations
+    real(8)                             :: profit, profit1, profit2, factr, pgtol, dsave(29)
+    character(len=60)                   :: task, csave
+    real(8), dimension(:), allocatable  :: wa
+    integer, dimension(:), allocatable  :: iwa
 
     n=2       ! less than 1024
     m=5       ! 15 for silam the higher the better...
     !x=(/lj_dps%logjmax,lj_dps%dpsi/)
-    x=(/0, 1/)   ! x should be the array    
+    x=(/4, 1/)   ! x should be the array    
     l=(/-10.0, 0.0001/)
     u=(/10.0, 1e6/)
     nbd=(/2, 2/)
@@ -187,12 +190,12 @@ contains
     mmax = 17              ! related to m in the beginning
     nwa=2*mmax*nmax + 5*nmax + 11*mmax*mmax + 8*mmax
     allocate(wa(nwa))
-
+    allocate(iwa(3*nmax))
     !wa(nwa)=
-    iwa=3*nmax
+    !iwa=3*nmax
+    
     task="START"
     iprint=40   ! print a bit more than usual
-    icsave=0     ! just a place holder
     lsave= (/.True., .True., .True., .True./)     ! 
     isave(1:44)=0        !
     dsave(1:29)=0.0      !
@@ -201,8 +204,7 @@ contains
     print *, "Before call, f=", profit,"  task number ",task, " "
 
     do iter = 1, maxIterations
-      call setulb(n, m, x, l, u, nbd, profit, grad, factr, pgtol, wa, iwa, task, iprint, icsave, lsave, isave, dsave)
-      
+      call setulb(n, m, x, l, u, nbd, profit, grad, factr, pgtol, wa, iwa, task, iprint, csave, lsave, isave, dsave)
      ! Print some basic informations about the optimization process 
       print *, "lbfgsb3 parameter results:", x
       print *, "task is ", task
@@ -273,9 +275,10 @@ contains
     
     ! Two demensional root-finding (derivatives):
     gs = calc_gs(dpsi, psi_soil, par_plant, par_env)      !* 1e6/par_photosynth$patm
+    
+    
     call calc_assim_light_limited(ci, aj, gs, jmax, par_photosynth)
     X=ci/par_photosynth%ca
-
 
     K = scale_conductivity(par_plant%conductivity, par_env)
     D = (par_env%vpd/par_env%patm)
@@ -285,18 +288,27 @@ contains
     ks = par_photosynth%kmm/par_photosynth%ca
     ca = par_photosynth%ca/par_photosynth%patm*1e6
     delta  = par_photosynth%delta
+    
+    print *, "J=", gs, ca, X, g, delta, ks
     J  = 4*gs*ca*(1-X)*(X+2*g)/(X*(1-delta)-(g+delta*ks)) 
 
     p = par_photosynth%phi0 * par_photosynth%Iabs
-    djmax_dJ = (4*p)**3/((4*p)**2-J**2)**(3/2)   
+    print *, "p=", par_photosynth%phi0, par_photosynth%Iabs 
+    print *, "djmax_dJ=", p, J
+    djmax_dJ = (4.0*p)**3.0/((4.0*p)**2.0-J**2.0)**(3.0/2.0)   
     
-    dJ_dchi = 4*gs*ca * ((delta*(2*g*(ks + 1) + ks*(2*X - 1) + X**2) - ((X-g)**2+3*g*(1-g)))/(d*(ks + X) + g - X)**2)
+    print *, "dj_dchi=", delta, g, ks, X, gs, ca
+    dJ_dchi = 4.0*gs*ca * ((delta*(2.0*g*(ks + 1) + ks*(2.0*X - 1) + X**2.0)       &
+                      - ((X-g)**2.0+3.0*g*(1.0-g)))/(delta*(ks + X) + g - X)**2.0)
  
-    dJ_ddpsi = 4*gsprime*ca*(1-X)*(X+2*g)/(X*(1-d)-(g+delta*ks))
+    dJ_ddpsi = 4*gsprime*ca*(1-X)*(X+2*g)/(X*(1-delta)-(g+delta*ks))
    
     grad(1) = -gs*ca - par_cost%alpha*djmax_dJ * dJ_dchi
     grad(2) = gsprime*ca*(1-X) - par_cost%alpha * djmax_dJ * &
                   dJ_ddpsi - 2*par_cost%gamma*dpsi ! /par_plantpsi50^2
+
+    print *, "grad1=", grad(1),gs, ca, par_cost%alpha, djmax_dJ, dJ_dchi 
+    print *, "grad2=", grad(2), gsprime, ca, X, dJ_ddpsi, par_cost%gamma, dpsi 
 
     ! One dimension root-finding (dFdx) 
     !gs = calc_gs(dpsi, psi_soil, par_plant, par_env)#* 1e6/par_photosynth$patm
@@ -704,12 +716,13 @@ contains
     d = par_photosynth%delta 
   
     A = -1.0 * gs0
-    B = gs0 * ca - gs * 2 * par_photosynth%gammastar - jlim*(1-d)
+    B = gs0 * ca - gs0 * 2 * par_photosynth%gammastar - jlim*(1-d)
     C = gs0 * ca * 2*par_photosynth%gammastar + jlim * (par_photosynth%gammastar + d*par_photosynth%kmm)
   
     call quadratic(A,B,C,ci)
     !ci = QUADM(A, B, C)  !? Fortran library for solving quadratic equation, check CTSM
-    aj = gs*(ca-ci)
+    !print *, "calc aj=", gs0, ca, ci
+    aj = gs0*(ca-ci)
     !vcmax_pot <- a*(ci + par$kmm)/(ci - par$gammastar)
   
   END SUBROUTINE calc_assim_light_limited
@@ -794,9 +807,14 @@ contains
 
     jmax = exp(par%logjmax)  ! Jmax in umol/m2/s (logjmax is supplied by the optimizer)
     dpsi = par%dpsi          ! delta Psi in MPa
+
+    print *, "jmax=", jmax
+    print *, "dpsi=", dpsi
   
     gs = calc_gs(dpsi, psi_soil, par_plant, par_env)  ! gs in mol/m2/s/Mpa
     E = 1.6*gs*(par_env%vpd/par_env%patm)*1e6         ! E in umol/m2/s
+
+    print *, gs, E
   
     ! light-limited assimilation
     call calc_assim_light_limited(ci, aj, gs, jmax, par_photosynth)  ! Aj in umol/m2/s
@@ -804,10 +822,14 @@ contains
     vcmax = aj*(ci + par_photosynth%kmm)/(ci*(1-par_photosynth%delta)-     &
                 (par_photosynth%gammastar+par_photosynth%kmm*par_photosynth%delta))
 
+    print *, "vcmax=", vcmax            
+
     costs = par_cost%alpha * jmax + par_cost%gamma * dpsi**2     !((abs((-dpsi)/par_plant$psi50)))^2  
     benefit = 1                                                 !(1+1/(par_photosynth$ca/40.53))/2
     dummy_costs = 0*exp(20*(-abs(dpsi/4)-abs(jmax/1)))          ! ONLY added near (0,0) for numerical stability. 
   
+    print *, "costs=", par_cost%alpha, par_cost%gamma, jmax, dpsi
+    print *, "aj=", aj, costs, dummy_costs, opt_hypothesis, do_optim
     if (opt_hypothesis == "PM") then
       ! Profit Maximisation
       fn_profit = aj*benefit - costs - dummy_costs
@@ -817,6 +839,7 @@ contains
     end if
   
     if (do_optim) then
+      print *, "doing optimization", do_optim
       fn_profit= -fn_profit
     else
       fn_profit=fn_profit
