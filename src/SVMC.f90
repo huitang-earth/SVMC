@@ -136,7 +136,7 @@ program SVMC
   step_nc_hr=0
   step_nc_day=0
 
-  print *, tot_hour_end
+  print *, tot_hour_end, ntim_out_hr, ntim_out_day
   ! Read time series of input data
   call netCDF_readTime(input_climfile, ntim_clim, start_clim_time, end_clim_time)
   call netCDF_readTime(input_laifile, ntim_lai, start_lai_time, end_lai_time)
@@ -214,8 +214,19 @@ program SVMC
           ! At what time scale the optimization should work need to be tested!!!!
           
           rdark=0.0
-          call pmodel_hydraulics_numerical(temp-273.15, ppfd*3600*24, vpd, co2*1000000, pres, fapar, &
-                                 psi_soil, rdark,                                                 &
+
+          print *, "temp =", temp-273.15                  ! unit should be C
+          print *, "ppfd =", ppfd*1000000.0/lai          ! umol/m2/s, current unit is wrong
+                                                         ! Averaging light absorption to each unit area of leaf (multi-layer leaf), 
+                                                         !     multiply lai when calculating GPP
+                                                         ! Alternatively, use total light absorption (one big leaf)
+                                                         !     no need to multiply lai when calculating GPP  
+          print *, "vpd =", vpd                          ! pa
+          print *, "co2 =", co2*1000000                  ! ppm
+          print *, "pres =", pres                        ! pa
+          print *, "fapar =", fapar                      ! frac
+          print *, "vol_liq =", vol_liq
+          print *, "psi_soil =", psi_soil*0.001          ! convert from Kpa to MPa
                                  jmax, dpsi, gs, aj, ci, chi, vcmax, profit, chi_jmax_lim            &
                                  )
           
@@ -242,10 +253,12 @@ program SVMC
           !************************************************************************
           if(step_nc_hr.eq.0)then
             !Initialize netcdf file
+            print *, "ntim_out_hr=", ntim_out_hr
             call netCDF_prepareOUTPUT(output_filename_hr, lon_sites, lat_sites, ntim_out_hr)
           end if
 
           gpp_matrix(1,1,1)=gpp
+          print *, "step_nc_hr=", step_nc_hr
           call netCDF_writeOUTPUT(output_filename_hr, "GPP", gpp_matrix, tot_hour/24.0, step_nc_hr)
           !call netCDF_writeOUTPUT(output_filename_hr, "Evap", tot_evap, tot_hour/24, step_nc_hr)
           !call netCDF_writeOUTPUT(output_filename_hr, "Transp", tr, tot_hour/24, step_nc_hr)
