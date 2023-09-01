@@ -739,10 +739,10 @@ contains
      real(8) :: root                     ! Term that will have a square root taken
      !------------------------------------------------------------------------------
     
-     if (a == 0.0) then
-        print *, "error 1"
-        return
-     end if
+     !if (a == 0.0) then
+     !   print *, "error 1"
+     !   return
+     !end if
 
      root = b*b - 4.0*a*c
      if ( root < 0.0 )then
@@ -757,12 +757,15 @@ contains
     if (a == 0.0) then
       if (b == 0.0) then
         r1 = 0.0
+        print *, "quadratic solution1"
       else
         r1 = -c/b
+        print *, "quadratic solution2"
       end if
     else
       q = -0.50 * (b + sqrt(root))
       r1 = q / a
+      print *, "quadratic solution3"
     end if
          
   end subroutine quadratic
