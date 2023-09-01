@@ -88,7 +88,7 @@ program SVMC
   real(8) :: vol_ice     ! v/v, volumetric ice in soil bucket 
   real(8) :: vol_liq     ! v/v, volumetric of liq in soil bucket     
   real(8) :: satfrac     ! parameter for Van Genuchten
-  real(8) :: n1, m1           ! (-), pore-size-distribution parameter for Van Genuchten 1.07
+  real(8) :: n1, m1, alpha_van           ! (-), pore-size-distribution parameter for Van Genuchten 1.07
   real(8) :: eff_porosity! v/v, volume of ice
 
   type(par_plant_type)          :: par_plant           ! A list of plant hydraulic parameters (will be defined in readpara_mod.f90).
@@ -174,18 +174,21 @@ program SVMC
             
             lai=lai_matrix(1,1,1)
             soilmoist=soilmoist_matrix(1,1,1) 
+            
             ! add soil rentention curve here to test soil water potential calculation
             n1=1.07       !Launiainen et al. 2022: C1-5: 1.12, 1.14, 1.07, 1.27, 1.18  
             m1=1.0/n1  
             watres=0.0   !Launiainen et al. 2022: C1-5: 0.0
-            alpha=2.02   !Launiainen et al. 2022: C1-5: 4.45, 5.92, 2.02, 4.49, 3.35
+            alpha_van=2.02   !Launiainen et al. 2022: C1-5: 4.45, 5.92, 2.02, 4.49, 3.35
             watsat=0.46  !Launiainen et al. 2022: C1-5: 0.75, 0.68, 0.46, 0.47, 0.54  
 
+            vol_liq=soilmoist
             vol_ice = 0.0   
             eff_porosity = max(0.01, watsat-vol_ice)
     
             satfrac  = (vol_liq-watres)/(eff_porosity-watres)
-            psi_soil = -(1.0/alpha)*(satfrac**(1.0/(m1-1.0)) - 1.0 )**m1
+            print *, "satfrac=", satfrac 
+            psi_soil = -(1.0/alpha_van)*(satfrac**(1.0/(m1-1.0)) - 1.0 )**m1  ! psi_soil in kPa
 
             ! calculate fapar:
             step_lai=step_lai+1
