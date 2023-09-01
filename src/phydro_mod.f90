@@ -217,8 +217,20 @@ contains
         print *, "At iteration", isave(34), " f =", profit
 
         ! Compute gradient g for the sample problem.
-        call gradient(grad, lj_dps, psi_soil,par_photosynth, par_plant, par_env, par_cost)
-        print *, "max(abs(g))=", max(abs(grad(1)), abs(grad(2)))
+        !call gradient(grad, lj_dps, psi_soil,par_photosynth, par_plant, par_env, par_cost)
+        
+
+        delta1_lj_dps%logjmax=x(1)+0.001
+        delta1_lj_dps%dpsi=x(2)
+        profit1=fn_profit(delta1_lj_dps, psi_soil, par_cost, par_photosynth, par_plant, par_env, .True.)
+
+        delta2_lj_dps%logjmax=x(1)
+        delta2_lj_dps%dpsi=x(2)+0.001
+        profit2=fn_profit(delta2_lj_dps, psi_soil, par_cost, par_photosynth, par_plant, par_env, .True.)
+
+        grad(1)=(profit1-profit)/0.001
+        grad(2)=(profit2-profit)/0.001
+        print *, "max(abs(g))=", max(abs(grad(1)), abs(grad(2))), grad(1), grad(2)
 
       else if (task(1:5) == 'NEW_X') then
         print *, "Continue"        !what is the meaning of "NEW_X"? 
