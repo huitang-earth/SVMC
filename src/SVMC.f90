@@ -128,8 +128,8 @@ program SVMC
  
   ! Calculate total hours of the simulation
   tot_hour_end= (juldate(end_date_day, end_date_hour) - juldate(start_date_day, start_date_hour))*24  
-  ntim_out_hr = mod(tot_hour_end, time_step_output)
-  ntim_out_day= mod(tot_hour_end, 24.0)
+  ntim_out_hr = tot_hour_end/time_step_output
+  ntim_out_day= tot_hour_end/24.0
 
   ! Run the model
   tot_hour=0.0
@@ -152,7 +152,7 @@ program SVMC
 
   print *, num_sites, lat_sites, lon_sites, tot_hour, num_pft   
   ! Loop over time, and locations
-  do while (tot_hour .le. tot_hour_end)  ! in hour or 30 minutes, time loop 
+  do while (tot_hour .lt. tot_hour_end)  ! in hour or 30 minutes, time loop 
     
     do i=1,num_sites  ! site loop (we do not use lon-lat box to allow the flexibility to run sites or regional/global simulations)
       
@@ -227,10 +227,16 @@ program SVMC
           print *, "fapar =", fapar                      ! frac
           print *, "vol_liq =", vol_liq
           print *, "psi_soil =", psi_soil*0.001          ! convert from Kpa to MPa
+
+          call pmodel_hydraulics_numerical(temp-273.15, ppfd*1000000.0/lai, vpd, co2*1000000, pres, fapar, &
+                                 psi_soil*0.001, rdark,                                                 &
                                  jmax, dpsi, gs, aj, ci, chi, vcmax, profit, chi_jmax_lim            &
                                  )
           
-          gpp= aj * c_molmass * lai
+          ! HT: need to multiply lai or not? probably not as fapar has considered the effect of lai.
+          gpp= aj * c_molmass * 1e-6 * 1e-3 * lai       ! aj in umol/m2/s, gpp kg C/m2/s multi-layer hypothesis
+          !gpp= aj * c_molmass * 1e-6 * 1e-3            ! big leaf hypothesis
+          print *, "gpp=", gpp, aj, c_molmass, lai
           ! Carbon allocation: update gpp, npp, ar ....
           ! call carbon_allocation_hr(a,....)          
         
