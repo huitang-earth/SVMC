@@ -645,7 +645,7 @@ contains
     !calc_gs=K/1.6/D * (-integral_P(dpsi, psi_soil, par_plant%psi50, par_plant%b))
 
     ! Use approximation of the integral instead
-    calc_gs=K/1.6/D * dpsi * (0.5**(((psi_soil-dpsi/2)/par_plant%psi50)**par_plant%b))
+    calc_gs=K/1.6/D * dpsi * (0.5**(((psi_soil-dpsi/2.0)/par_plant%psi50)**par_plant%b))
     
     ! papprox = P(psi_soil-dpsi/2, par_plant$psi50, par_plant$b)
     ! papprox = P(psi_soil, par_plant$psi50, par_plant$b)-Pprime(psi_soil, par_plant$psi50, par_plant$b)*dpsi/2.5
@@ -825,8 +825,8 @@ contains
     print *, "vcmax=", vcmax            
 
     costs = par_cost%alpha * jmax + par_cost%gamma * dpsi**2     !((abs((-dpsi)/par_plant$psi50)))^2  
-    benefit = 1                                                 !(1+1/(par_photosynth$ca/40.53))/2
-    dummy_costs = 0*exp(20*(-abs(dpsi/4)-abs(jmax/1)))          ! ONLY added near (0,0) for numerical stability. 
+    benefit = 1.0                                                 !(1+1/(par_photosynth$ca/40.53))/2
+    dummy_costs = 0.0*exp(20.0*(-abs(dpsi/4.0)-abs(jmax/1.0)))          ! ONLY added near (0,0) for numerical stability. 
   
     print *, "costs=", par_cost%alpha, par_cost%gamma, jmax, dpsi
     print *, "aj=", aj, costs, dummy_costs, opt_hypothesis, do_optim
