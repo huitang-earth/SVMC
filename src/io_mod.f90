@@ -43,7 +43,7 @@ contains
                pftdim_id, pftvar_id, gppvar_id, neevar_id, nppvar_id, trvar_id, arvar_id, &
                hrvar_id, srvar_id, laivar_id, scvar_id, stvar_id, evvar_id, travar_id, &
                smvar_id, smpvar_id, cyvar_id, abvar_id, tbvar_id, lcvar_id, rcvar_id, fpvar_id, &
-               namedim_id
+               namedim_id, jmvar_id, vcvar_id, dpsivar_id, chivar_id, provar_id
     integer :: nx_lon=1, ny_lat=1, ntim
     integer :: yyyy,mm,dd,hh,mi,ss
 
@@ -90,6 +90,12 @@ contains
     call check(nf90_def_var(nc_id, "leaf_carbon_content", nf90_float, (/londim_id,latdim_id,timedim_id/), lcvar_id))
     call check(nf90_def_var(nc_id, "root_carbon_content", nf90_float, (/londim_id,latdim_id,timedim_id/), rcvar_id))
     call check(nf90_def_var(nc_id, "fPAR", nf90_float, (/londim_id,latdim_id,timedim_id/), fpvar_id))
+
+    call check(nf90_def_var(nc_id, "Jmax", nf90_float, (/londim_id,latdim_id,timedim_id/), jmvar_id))
+    call check(nf90_def_var(nc_id, "Vcmax", nf90_float, (/londim_id,latdim_id,timedim_id/), vcvar_id))
+    call check(nf90_def_var(nc_id, "Chi", nf90_float, (/londim_id,latdim_id,timedim_id/), chivar_id))
+    call check(nf90_def_var(nc_id, "Dpsi", nf90_float, (/londim_id,latdim_id,timedim_id/), dpsivar_id))
+    call check(nf90_def_var(nc_id, "Profit", nf90_float, (/londim_id,latdim_id,timedim_id/), provar_id))
 
     !Attributes
     call check(NF90_PUT_ATT(nc_id, lonvar_id, "units", "degrees_east"))
@@ -141,7 +147,7 @@ contains
     call check(NF90_PUT_ATT(nc_id, scvar_id, "units", "kg C m-2"))
     call check(NF90_PUT_ATT(nc_id, scvar_id, "standard_name", "	soil_carbon_content_of_soil_layer"))
     call check(NF90_PUT_ATT(nc_id, scvar_id, "long_name", "Soil Carbon Content by Layer"))
-    call check(NF90_PUT_ATT(nc_id, stvar_id, "units", "kg m-2 s-1"))
+    call check(NF90_PUT_ATT(nc_id, stvar_id, "units", "mol H2O m-2 s-1"))     ! Unit not consistent with pecan
     call check(NF90_PUT_ATT(nc_id, stvar_id, "standard_name", "stomatal_conductance"))
     call check(NF90_PUT_ATT(nc_id, stvar_id, "long_name", "Stomatal Conductance"))
     call check(NF90_PUT_ATT(nc_id, evvar_id, "units", "kg m-2 s-1"))
@@ -153,8 +159,8 @@ contains
     call check(NF90_PUT_ATT(nc_id, smvar_id, "units", "kg m-2"))
     call check(NF90_PUT_ATT(nc_id, smvar_id, "standard_name", "Soil moisture"))
     call check(NF90_PUT_ATT(nc_id, smvar_id, "long_name", "Average Layer Soil Moisture"))
-    call check(NF90_PUT_ATT(nc_id, smpvar_id, "units", "mm"))
-    call check(NF90_PUT_ATT(nc_id, smpvar_id, "standard_name", "soil suction, negative [mm]"))
+    call check(NF90_PUT_ATT(nc_id, smpvar_id, "units", "MPa"))
+    call check(NF90_PUT_ATT(nc_id, smpvar_id, "standard_name", "soil water potential"))
     call check(NF90_PUT_ATT(nc_id, smpvar_id, "long_name", "Average Layer Soil water potential"))    
 
     call check(NF90_PUT_ATT(nc_id, cyvar_id, "units", "kg m-2"))
@@ -175,6 +181,22 @@ contains
     call check(NF90_PUT_ATT(nc_id, fpvar_id, "units", "-"))
     call check(NF90_PUT_ATT(nc_id, fpvar_id, "standard_name", "fPAR"))
     call check(NF90_PUT_ATT(nc_id, fpvar_id, "long_name", "Absorbed fraction incoming PAR"))
+    call check(NF90_PUT_ATT(nc_id, jmvar_id, "units", "umol C m-2 s-1"))
+    call check(NF90_PUT_ATT(nc_id, jmvar_id, "standard_name", "Jmax"))
+    call check(NF90_PUT_ATT(nc_id, jmvar_id, "long_name", "Maximum electron-transport capacity of leaves, under light saturation"))
+    call check(NF90_PUT_ATT(nc_id, vcvar_id, "units", "umol C m-2 s-1"))
+    call check(NF90_PUT_ATT(nc_id, vcvar_id, "standard_name", "Vcmax"))
+    call check(NF90_PUT_ATT(nc_id, vcvar_id, "long_name", "Maximum carboxylation capacity of leaves"))
+    call check(NF90_PUT_ATT(nc_id, dpsivar_id, "units", "MPa"))
+    call check(NF90_PUT_ATT(nc_id, dpsivar_id, "standard_name", "Dpsi"))
+    call check(NF90_PUT_ATT(nc_id, dpsivar_id, "long_name", "Soil-to-leaf water potential difference"))
+    call check(NF90_PUT_ATT(nc_id, chivar_id, "units", "-"))
+    call check(NF90_PUT_ATT(nc_id, chivar_id, "standard_name", "Leaf internal-to-external CO2 ratio"))
+    call check(NF90_PUT_ATT(nc_id, chivar_id, "long_name", "Leaf internal-to-external CO2 ratio"))
+    call check(NF90_PUT_ATT(nc_id, provar_id, "units", "umol m-2 s-1"))
+    call check(NF90_PUT_ATT(nc_id, provar_id, "standard_name", "Profit"))
+    call check(NF90_PUT_ATT(nc_id, provar_id, "long_name", "Optimized profit of photosynthesis"))
+
 
     !Finished defining
     call check( nf90_enddef(nc_id) )
