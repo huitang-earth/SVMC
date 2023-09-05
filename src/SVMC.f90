@@ -66,7 +66,9 @@ program SVMC
   real(8), dimension(1,1,1)  :: lai_matrix, soilmoist_matrix
   real(8), dimension(1,1,1)  :: temp_matrix, ppfd_matrix, prec_matrix, &
                                 sh_matrix, rh_matrix, vpd_matrix, &
-                                pres_matrix, co2_matrix, gpp_matrix
+                                pres_matrix, co2_matrix, gpp_matrix, &
+                                jmax_matrix, vcmax_matrix, dpsi_matrix, &
+                                chi_matrix, profit_matrix, gs_matrix
 
   real(8)     ::    lai
 
@@ -74,8 +76,8 @@ program SVMC
                                                 ! \deqn{A_J = A_C} 
                                                 !  Electron transport capacity (umol/m2/s)
   real(8)    :: dpsi       ! soil-to-leaf water potential difference (\eqn{\psi_s-\psi_l}), Mpa
-  real(8)    :: gs         ! Stomatal conductance (gs, in mol C m-2 Pa-1), calculated as
-  real(8)    :: aj        ! electron-transport limited assimilation rate (umol/m2/s)
+  real(8)    :: gs         ! Stomatal conductance (gs, in mol m-2 s-1)
+  real(8)    :: aj         ! electron-transport limited assimilation rate (umol/m2/s)
   real(8)    :: ci         !  leaf-internal CO2 concentration, converted to partial pressure (Pa)
   real(8)    :: chi        ! Optimal ratio of leaf internal to ambient CO2 (unitless).
   real(8)    :: vcmax      !   Carboxylation capacity (umol/m2/s)
@@ -266,9 +268,23 @@ program SVMC
             call netCDF_prepareOUTPUT(output_filename_hr, lon_sites, lat_sites, ntim_out_hr)
           end if
 
-          gpp_matrix(1,1,1)=gpp
+          gpp_matrix(1,1,1)   =gpp
+          gs_matrix(1,1,1)    =gs
+          jmax_matrix(1,1,1)  =jmax
+          vcmax_matrix(1,1,1) =vcmax
+          chi_matrix(1,1,1)   =chi
+          dpsi_matrix(1,1,1)  =dpsi
+          profit_matrix(1,1,1)=profit
           print *, "step_nc_hr=", step_nc_hr
+
           call netCDF_writeOUTPUT(output_filename_hr, "GPP", gpp_matrix, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "stomatal_conductance", gs_matrix, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "Jmax", jmax_matrix, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "Vcmax", vcmax_matrix, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "Chi", chi_matrix, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "Dpsi", dpsi_matrix, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "Profit", profit_matrix, tot_hour/24.0, step_nc_hr)
+
           !call netCDF_writeOUTPUT(output_filename_hr, "Evap", tot_evap, tot_hour/24, step_nc_hr)
           !call netCDF_writeOUTPUT(output_filename_hr, "Transp", tr, tot_hour/24, step_nc_hr)
           !call netCDF_writeOUTPUT(output_filename_hr, "SoilMoist", soilwater_state%WatSto, tot_hour/24, step_nc_hr)
