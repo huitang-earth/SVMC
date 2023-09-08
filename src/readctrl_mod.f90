@@ -33,7 +33,7 @@ MODULE readctrl_mod
   integer :: num_sites              ! This can be set by reading input file
   real(8), dimension(1)    :: lat_sites, lon_sites   ! This can be set by reading input file 
   real    :: time_step, time_step_output
-  character(len=256)  :: output_filename, output_filename_hr, input_climfile, input_laifile
+  character(len=256)  :: output_filename_day, output_filename_hr, input_climfile, input_laifile
 
 contains
   !------------------------------------------------------
@@ -52,15 +52,15 @@ contains
     input_climfile, &
     input_laifile, &
     time_step_output, &
-    output_filename
+    output_filename_hr
 
     old=.false.
     
     ! Presetting namelist command
-    start_date_day  =20210501
+    start_date_day  =20210101
     start_date_hour =000000
     time_step       =1               ! hours
-    end_date_day    =20211001
+    end_date_day    =20211231
     end_date_hour   =000000
     num_sites       =1                 ! number of sites, should also be read from input file?
     ! lon_sites     = (/ /)            ! longitude of sites (not needed, can be well defined input file)
@@ -68,8 +68,8 @@ contains
     input_climfile      ='../data/FieldObs_Qvidja.2021.hr.nc'         
     input_laifile       ='../data/FieldObs_Qvidja.2021.lai.nc'
     time_step_output=1.0
-    output_filename ='../data/test.nc' 
-    output_filename_hr ='../data/test_hr.nc' 
+    output_filename_day ='../data/test.nc' 
+    output_filename_hr ='../data/test_hr_2021_nolai_default_alpha0.08_gs_spafhy.nc' 
 
     ! Reading namelist
     !open(unitcommand, file='./ctrl_namelist', status='old', form='formatted', err=999)
