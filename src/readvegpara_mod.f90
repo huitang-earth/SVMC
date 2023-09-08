@@ -48,18 +48,21 @@ MODULE readvegpara_mod
   end type optimizer_type
 
   ! constants needed by p-hydro
-  real(8)            :: kv = 0.4  ! von Karman constant (-)
-  real(8)            :: beta   ! s/m, from Campbell & Norman eq. (7.33) x 42.0 molm-3
 
   real(8)            :: kphio=0.087182     ! Apparent quantum yield efficiency (unitless). default: 0.087182 
   real(8)            :: k=0.5              ! dimensionless constant, assigned a generic value of 0.5, Beer's law.
+                                           ! canopy light attenuation parameter (-)
                                           ! light absorption by LAI (according to Qiao et al. 2020)
-  real(8)            :: c_molmass =12.0107  ! molecular mass of carbon (g)
-
+  real(8)            :: c_molmass =12.0107  ! molecular mass of carbon (g/mol)
+  real(8)            :: h2o_molmass =18.01528  ! molecular mass of carbon (g/mol)
   
   !------------------------------------
   ! Canopy water parameters (Spafhy)
+  !------------------------------------
+  
   ! canopy interception
+  real(8)            :: kv = 0.4  ! von Karman constant (-)
+  real(8)            :: beta_aero=285.0   ! s/m, from Campbell & Norman eq. (7.33) x 42.0 molm-3
   real(8) :: wmax     ! storage capacity for rain (mm/LAI), Hui: this is too much compared to CTSM
   real(8) :: wmaxsnow ! storage capacity for snow (mm/LAI), Hui: this is reasonable
 
@@ -69,9 +72,10 @@ MODULE readvegpara_mod
   !real(r8)  :: LAI_decid
   real(8)  :: hc         ! canopy height (m)
   real(8)  :: cf         ! canopy closure fraction (-)
+  real(8)  :: w_leaf     ! leaf length scale (m)
 
   ! canopy conductance                     
-  ! real(r8), parameter :: kp =0.6         ! canopy light attenuation parameter (-) Hui: This overlaps with p-hydro
+  ! real(r8), parameter :: kp =0.6         ! c Hui: This overlaps with p-hydro
   real(8) :: rw         ! critical value for REW (-),
   real(8) :: rwmin        ! minimum relative conductance (-)
   ! soil evaporation
@@ -100,7 +104,7 @@ MODULE readvegpara_mod
   ! degree-day snow model
   real(8) :: kmelt         ! melt coefficient in open (mm/s)
   real(8) :: kfreeze       ! freezing coefficient (mm/s)
-  real(8) :: r             ! maximum fraction of liquid in snow (-)
+  real(8) :: frac_snowliq              ! r, maximum fraction of liquid in snow (-)
 
   ! flow field
   real(8) :: zmeas    
@@ -125,7 +129,6 @@ contains
       alpha, &
       gamma, &
       opt_hypothesis, &
-      beta, &
       wmax, &
       wmaxsnow, &
       hc ,&
@@ -135,7 +138,6 @@ contains
       gsoil, &
       kmelt, &
       kfreeze, &
-      r, &
       zmeas, &
       zground, &
       zo_ground
@@ -149,27 +151,27 @@ contains
     !--- Parameters for P-hydro model
     ! Plant hydraulic parameters
     conductivity=3e-17     ! Leaf conductivity (m) (for stem, this could be Ks*HV/Height)
-    psi50 = -2             ! Leaf P50 (Mpa), default is -2
+    psi50 = -4             ! Leaf P50 (Mpa), default is -2
     b=2                  ! Slope of leaf vulnerability curve, default is 2 
 
     ! A list of cost parameters
-    alpha=0.05     !cost of Jmax, default: 0.1
-    gamma=0.5     !cost of hydraulic repair, default: 1
+    alpha=0.08     !cost of Jmax, default: 0.1
+    gamma=1     !cost of hydraulic repair, default: 1
 
-    opt_hypothesis= 'PM'          ! character, Either "LC" or "PM"      
+    opt_hypothesis= 'PM'          ! character, Either "LC" or "PM"     
 
-    ! vegetation status (p-hydro)
-    beta = 285.0   ! s/m, from Campbell & Norman eq. (7.33) x 42.0 molm-3
+    ! Parameters related to Spafhy
 
     ! Canopy water parameters (Spafhy)
     ! canopy interception
-    wmax = 1.5      ! storage capacity for rain (mm/LAI), Hui: this is too much compared to CTSM
+    wmax = 0.5      ! storage capacity for rain (mm/LAI), default: 1.5 too high? Hui: this is too much compared to CTSM
     wmaxsnow = 4.5  ! storage capacity for snow (mm/LAI), Hui: this is reasonable
 
     ! LAI is annual maximum LAI and for gridded simulations are input from GisData!
     ! keys must be 'LAI_ + key in spec_para
     hc = 0.6         ! canopy height (m)
     cf = 0.6          ! canopy closure fraction (-)
+    w_leaf=0.01       !leaf length scale (m)
 
     ! canopy conductance                     
     ! real(r8), parameter :: kp =0.6         ! canopy light attenuation parameter (-) Hui: This overlaps with p-hydro
@@ -182,7 +184,7 @@ contains
     ! degree-day snow model
     kmelt   = 2.8934e-05    ! melt coefficient in open (mm/s)
     kfreeze = 5.79e-6       ! freezing coefficient (mm/s)
-    r       = 0.05          ! maximum fraction of liquid in snow (-)
+    frac_snowliq = 0.05          ! maximum fraction of liquid in snow (-)
 
     ! flow field
     zmeas     = 2.0
