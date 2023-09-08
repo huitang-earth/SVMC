@@ -83,7 +83,7 @@ contains
     call check(nf90_def_var(nc_id, "Evap", nf90_float, (/londim_id,latdim_id,timedim_id/), evvar_id))   
     call check(nf90_def_var(nc_id, "Transp", nf90_float, (/londim_id,latdim_id,timedim_id/), travar_id))
     call check(nf90_def_var(nc_id, "SoilMoist", nf90_float, (/londim_id,latdim_id,timedim_id/), smvar_id))
-    call check(nf90_def_var(nc_id, "SoilMoistPot", nf90_float, (/londim_id,latdim_id,timedim_id/), smpvar_id))
+    call check(nf90_def_var(nc_id, "SoilMoistPot", nf90_double, (/londim_id,latdim_id,timedim_id/), smpvar_id))
     call check(nf90_def_var(nc_id, "CropYield", nf90_float, (/londim_id,latdim_id,timedim_id/), cyvar_id))
     call check(nf90_def_var(nc_id, "AGB", nf90_float, (/londim_id,latdim_id,timedim_id/), abvar_id))
     call check(nf90_def_var(nc_id, "TotLivBiom", nf90_float, (/londim_id,latdim_id,timedim_id/), tbvar_id))
@@ -147,7 +147,7 @@ contains
     call check(NF90_PUT_ATT(nc_id, scvar_id, "units", "kg C m-2"))
     call check(NF90_PUT_ATT(nc_id, scvar_id, "standard_name", "	soil_carbon_content_of_soil_layer"))
     call check(NF90_PUT_ATT(nc_id, scvar_id, "long_name", "Soil Carbon Content by Layer"))
-    call check(NF90_PUT_ATT(nc_id, stvar_id, "units", "mol H2O m-2 s-1"))     ! Unit not consistent with pecan
+    call check(NF90_PUT_ATT(nc_id, stvar_id, "units", "mol CO2 m-2 s-1"))     ! Unit not consistent with pecan
     call check(NF90_PUT_ATT(nc_id, stvar_id, "standard_name", "stomatal_conductance"))
     call check(NF90_PUT_ATT(nc_id, stvar_id, "long_name", "Stomatal Conductance"))
     call check(NF90_PUT_ATT(nc_id, evvar_id, "units", "kg m-2 s-1"))
@@ -357,7 +357,7 @@ contains
   end subroutine
   
 
-  subroutine netCDF_readClim(filename,temp, ppfd, prec, sh, rh, vpd, pres, co2, i)
+  subroutine netCDF_readClim(filename,temp, ppfd, Rn, prec, sh, rh, vpd, pres, co2, wind, i)
     ! Read meteorological forcing variables
     ! temp.... other forcing variables need to be defined
   
@@ -366,16 +366,18 @@ contains
 
     character(*), intent(in) :: filename
     integer, intent(in)      :: i
-    real(8),dimension(:,:,:), intent(out) :: temp, ppfd, prec, sh, rh, vpd, pres, co2
+    real(8),dimension(:,:,:), intent(out) :: temp, ppfd, Rn, prec, sh, rh, vpd, pres, co2, wind
 
     call netCDF_readvar(filename, "air_temperature", temp, i)
     call netCDF_readvar(filename, "surface_downwelling_photosynthetic_photon_flux_in_air", ppfd,i)
+    call netCDF_readvar(filename, "surface_downwelling_shortwave_flux_in_air", Rn ,i)
     call netCDF_readvar(filename, "precipitation_flux", prec, i)
     call netCDF_readvar(filename, "specific_humidity", sh, i)
     call netCDF_readvar(filename, "relative_humidity", rh, i)
     call netCDF_readvar(filename, "water_vapor_saturation_deficit", vpd, i)
     call netCDF_readvar(filename, "air_pressure", pres, i)
     call netCDF_readvar(filename, "mole_fraction_of_carbon_dioxide_in_air", co2, i)
+    call netCDF_readvar(filename, "wind_speed", wind, i)
     
   end subroutine netCDF_readClim 
 
