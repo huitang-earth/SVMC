@@ -19,6 +19,7 @@ MODULE phydro_mod
 
   !Public member functions:
   public :: pmodel_hydraulics_numerical   ! p-hydro module
+  public :: density_h2o                   ! water density function
 
   interface
     subroutine setulb(n, m, x, l, u, nbd, f, g, factr, pgtol, wa, iwa, &
@@ -812,7 +813,7 @@ contains
     print *, "dpsi=", dpsi
   
     gs = calc_gs(dpsi, psi_soil, par_plant, par_env)  ! gs in mol/m2/s/Mpa
-    E = 1.6*gs*(par_env%vpd/par_env%patm)*1e6         ! E in umol/m2/s
+    E = 1.6*gs*(par_env%vpd/par_env%patm)*1e6         ! E in umol H2O/m2/s
 
     print *, gs, E
   
