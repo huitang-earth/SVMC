@@ -27,12 +27,14 @@ LDFLAGS  = $(FFLAGS)  -L$(LIBPATH1) $(LIBS)  #-Wl,-rpath,$(LIBPATH1) $(LIBPATH2)
 MODOBJS = \
 readctrl_mod.o   \
 readvegpara_mod.o \
+readsoilpara_mod.o \
 io_mod.o   \
 timer.o \
 blas.o   \
 linpack.o \
 lbfgsb.o \
 phydro_mod.o \
+spafhy_mod.o \
 juldate.o
 
 OBJECTS = \
