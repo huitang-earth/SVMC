@@ -21,12 +21,11 @@ program SVMC
 !  use initialization_mod        ! initialize svm model
   use readctrl_mod              ! module for reading control parameters from namelist file
   use readvegpara_mod           ! module for reading vegetation parameter from namelist file
-  !use readsoilpara_mod          ! module for reading soil parameter from namelist file 
-  !use readclim_mod              ! module for reading reading meteorological forcing data
+  use readsoilpara_mod          ! module for reading soil parameter from namelist file 
   use io_mod                    ! manage input/output of the model
 
   use phydro_mod                ! module for p-hydro
- ! use spafhy_mod                ! module for soil water bucket model, which will provide psi_soil for p-hydro
+  use spafhy_mod                ! module for soil water bucket model, which will provide psi_soil for p-hydro
   !use alloc_mod                ! module for carbon allocation and yield
  ! use yasso                     ! module for soil decomposition model, which will provide heterogeneous respiration (hr)   
 
@@ -46,7 +45,6 @@ program SVMC
   !Model variables
   !***********************************
 
-
   ! p-hydro variabless
   ! Input variables for p-hydro (the definition is from rpmodel.R)
   real(8)     ::    temp        ! Air temperature (tc), degrees C
@@ -59,16 +57,19 @@ program SVMC
   real(8)     ::    pres
   real(8)     ::    sh
   real(8)     ::    rh
-  real(8)     ::    psi_soil  ! soil water potential (Mpa)
+  real(8)     ::    wind
+  real(8)     ::    rg, rn
+  real(8)     ::    psi_soil, psi_soil_spafhy  ! soil water potential (Mpa)
   real(8)     ::    soilmoist
   real(8)     ::    rdark     
 
   real(8), dimension(1,1,1)  :: lai_matrix, soilmoist_matrix
-  real(8), dimension(1,1,1)  :: temp_matrix, ppfd_matrix, prec_matrix, &
-                                sh_matrix, rh_matrix, vpd_matrix, &
+  real(8), dimension(1,1,1)  :: temp_matrix, ppfd_matrix, rg_matrix, prec_matrix, &
+                                sh_matrix, rh_matrix, vpd_matrix, wind_matrix, &
                                 pres_matrix, co2_matrix, gpp_matrix, &
                                 jmax_matrix, vcmax_matrix, dpsi_matrix, &
-                                chi_matrix, profit_matrix, gs_matrix
+                                chi_matrix, profit_matrix, gs_matrix, &
+                                evap_matrix, psi_soil_matrix, soilmoist1_matrix
 
   real(8)     ::    lai
 
@@ -83,21 +84,25 @@ program SVMC
   real(8)    :: vcmax      !   Carboxylation capacity (umol/m2/s)
   real(8)    :: profit                  ! Net assimilation rate after accounting for costs
   real(8)    :: chi_jmax_lim      ! Analytical chi in the case of strong Jmax limitation
+  real(8)    :: gpp
+  real(8)    :: tr_phydro   ! Transpiration estimated by p-hydro model
 
   ! spafhy variables
-  real(8) :: watsat      ! v/v saturate moisture
-  real(8) :: watres      ! v/v, residual soil moisture for Van Genuchten
-  real(8) :: vol_ice     ! v/v, volumetric ice in soil bucket 
-  real(8) :: vol_liq     ! v/v, volumetric of liq in soil bucket     
-  real(8) :: satfrac     ! parameter for Van Genuchten
-  real(8) :: n1, m1, alpha_van           ! (-), pore-size-distribution parameter for Van Genuchten 1.07
-  real(8) :: eff_porosity! v/v, volume of ice
+  real(8)    :: tr_spafhy   ! Transpiration estimated by spafhy model
+  real(8)    :: retflow     ! return flow from ground water [m]
+  
+  ! For soil water retention curve
+ ! real(8) :: watsat      ! v/v saturate moisture
+  !real(8) :: watres      ! v/v, residual soil moisture for Van Genuchten
+  !real(8) :: vol_ice     ! v/v, volumetric ice in soil bucket 
+  !real(8) :: vol_liq     ! v/v, volumetric of liq in soil bucket     
+  !real(8) :: satfrac     ! parameter for Van Genuchten
+  !real(8) :: n1, m1, alpha_van           ! (-), pore-size-distribution parameter for Van Genuchten 1.07
+  !real(8) :: eff_porosity! v/v, volume of ice
 
-  type(par_plant_type)          :: par_plant           ! A list of plant hydraulic parameters (will be defined in readpara_mod.f90).
-  type(par_cost_type)           :: par_cost            ! A list of cost parameters (will be defined in readpara_mod.f90).
-
-  ! Output variables
-  real(8)    :: gpp
+  type(soilwater_type)          :: soilwater_state  
+  type(canopywater_type)        :: canopywater_state
+  type(snowwater_type)        :: snowwater_state
 
   !character(len=200)  ::
   !real,dimension(:,:), allocatable
@@ -118,6 +123,11 @@ program SVMC
   ! psi_soil=0
   call readctrl_namelist
   call readvegpara_namelist
+  call readsoilhydro_namelist
+
+  !call set_soilwaterState(soilwater_state, canopywater_state)
+  call initialization_spafhy(canopywater_state, snowwater_state, soilwater_state)
+
 
   !***********************************
   ! Set time control parameters
@@ -175,22 +185,23 @@ program SVMC
             call netCDF_readsoilmoist('../data/FieldObs_Qvidja.2021.soilmoist.nc', soilmoist_matrix, step_lai)
             
             lai=lai_matrix(1,1,1)
-            soilmoist=soilmoist_matrix(1,1,1) 
+            soilmoist=soilmoist_matrix(1,1,1)             
             
+            call soil_water_retention_curve(soilmoist, psi_soil)
             ! add soil rentention curve here to test soil water potential calculation
-            n1=1.07       !Launiainen et al. 2022: C1-5: 1.12, 1.14, 1.07, 1.27, 1.18  
-            m1=1.0/n1  
-            watres=0.0   !Launiainen et al. 2022: C1-5: 0.0
-            alpha_van=2.02   !Launiainen et al. 2022: C1-5: 4.45, 5.92, 2.02, 4.49, 3.35
-            watsat=0.46  !Launiainen et al. 2022: C1-5: 0.75, 0.68, 0.46, 0.47, 0.54  
+            !n1=1.07       !Launiainen et al. 2022: C1-5: 1.12, 1.14, 1.07, 1.27, 1.18  
+            !m1=1.0/n1  
+            !watres=0.0   !Launiainen et al. 2022: C1-5: 0.0
+            !alpha_van=2.02   !Launiainen et al. 2022: C1-5: 4.45, 5.92, 2.02, 4.49, 3.35
+            !watsat=0.46  !Launiainen et al. 2022: C1-5: 0.75, 0.68, 0.46, 0.47, 0.54  
 
-            vol_liq=soilmoist
-            vol_ice = 0.0   
-            eff_porosity = max(0.01, watsat-vol_ice)
+            !vol_liq=soilmoist
+            !vol_ice = 0.0   
+            !eff_porosity = max(0.01, watsat-vol_ice)
     
-            satfrac  = (vol_liq-watres)/(eff_porosity-watres)
-            print *, "satfrac=", satfrac 
-            psi_soil = -(1.0/alpha_van)*(satfrac**(1.0/(m1-1.0)) - 1.0 )**m1  ! psi_soil in kPa
+            !satfrac  = (vol_liq-watres)/(eff_porosity-watres)
+            !print *, "satfrac=", satfrac 
+            !psi_soil = -(1.0/alpha_van)*(satfrac**(1.0/(m1-1.0)) - 1.0 )**m1  ! psi_soil in kPa
 
             ! calculate fapar:
             step_lai=step_lai+1
@@ -199,18 +210,20 @@ program SVMC
 
           ! Determine whether to read new climate variables
           ! if () then
-          call netCDF_readClim(input_climfile, temp_matrix, ppfd_matrix, prec_matrix, &
+          call netCDF_readClim(input_climfile, temp_matrix, ppfd_matrix, rg_matrix, prec_matrix, &
                        sh_matrix, rh_matrix, vpd_matrix, pres_matrix, &
-                       co2_matrix, step_clim)
+                       co2_matrix, wind_matrix, step_clim)
 
           temp=temp_matrix(1,1,1)
           ppfd=ppfd_matrix(1,1,1)
+          rg  = rg_matrix(1,1,1)
           prec=prec_matrix(1,1,1)
           sh=sh_matrix(1,1,1)
           rh=rh_matrix(1,1,1)
           vpd=vpd_matrix(1,1,1)
           pres=pres_matrix(1,1,1)
           co2=co2_matrix(1,1,1) 
+          wind=wind_matrix(1,1,1)
           
           step_clim=step_clim+1
           ! end if
@@ -230,7 +243,7 @@ program SVMC
           print *, "co2 =", co2*1000000                  ! ppm
           print *, "pres =", pres                        ! pa
           print *, "fapar =", fapar                      ! frac
-          print *, "vol_liq =", vol_liq
+          !print *, "vol_liq =", vol_liq
           print *, "psi_soil =", psi_soil*0.001          ! convert from Kpa to MPa
 
           call pmodel_hydraulics_numerical(temp-273.15, ppfd*1000000.0/lai, vpd, co2*1000000, pres, fapar, &
@@ -247,8 +260,28 @@ program SVMC
         
           ! Update transpiration, canopy evaporation...
           ! CanopyGrid in spafhy...
-          ! call canopy_water_flux(gs, ppfd*fapar*, temp, prec, Rg, Par, VPD, U=2.0, co2, Rew=1.0, beta=1.0, P=101300.0)       
-        
+          ! in mm/s H20
+          ! Transpiration derived from P-hydro
+
+          tr_phydro = 1.6*gs*(vpd/pres)*h2o_molmass/density_h2o(temp-273.15, pres)     
+          rn= rg * 0.7
+          !rn = max(2.57*lai/(2.57*lai+0.57)-0.2, 0.55)*rg  ! Launiainen et al. 2016 GCB, fit to Fig 2a
+
+          call canopy_water_flux(gs, rn, temp-273.15, prec, ppfd, vpd,  &
+                                  wind, co2*1000000, soilwater_state%Rew, & 
+                                  pres, lai, canopywater_state, snowwater_state)       
+          
+          ! Everything is in the unit of mm/s, no need to multiply dt?
+          canopywater_state%ET =  tr_phydro +  canopywater_state%Efloor +     &
+                                      canopywater_state%Evap/(time_step*3600.0)
+
+          retflow=0.0
+          tr_spafhy=tr_phydro*(time_step*3600.0*1.0e-3)
+          call soil_water(soilwater_state, snowwater_state%PotInf*1.0e-3, &
+                          tr_spafhy,  &
+                          canopywater_state%Efloor*(time_step*3600.0*1.0e-3), retflow)  
+
+          call soil_water_retention_curve(soilwater_state%Wliq, psi_soil_spafhy) 
 
         !end if  !phenology
         
@@ -275,6 +308,9 @@ program SVMC
           chi_matrix(1,1,1)   =chi
           dpsi_matrix(1,1,1)  =dpsi
           profit_matrix(1,1,1)=profit
+          soilmoist1_matrix(1,1,1)=soilwater_state%Wliq
+          psi_soil_matrix(1,1,1)=psi_soil_spafhy
+          evap_matrix(1,1,1)=canopywater_state%ET
           print *, "step_nc_hr=", step_nc_hr
 
           call netCDF_writeOUTPUT(output_filename_hr, "GPP", gpp_matrix, tot_hour/24.0, step_nc_hr)
@@ -285,10 +321,12 @@ program SVMC
           call netCDF_writeOUTPUT(output_filename_hr, "Dpsi", dpsi_matrix, tot_hour/24.0, step_nc_hr)
           call netCDF_writeOUTPUT(output_filename_hr, "Profit", profit_matrix, tot_hour/24.0, step_nc_hr)
 
-          !call netCDF_writeOUTPUT(output_filename_hr, "Evap", tot_evap, tot_hour/24, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "Evap", evap_matrix, tot_hour/24.0, step_nc_hr)
           !call netCDF_writeOUTPUT(output_filename_hr, "Transp", tr, tot_hour/24, step_nc_hr)
-          !call netCDF_writeOUTPUT(output_filename_hr, "SoilMoist", soilwater_state%WatSto, tot_hour/24, step_nc_hr)
-          !call netCDF_writeOUTPUT(output_filename_hr, "SoilMoistPot", smp, tot_hour/24, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "SoilMoist", soilmoist1_matrix, tot_hour/24.0, step_nc_hr)
+          print *, "psi=", psi_soil_matrix, soilmoist1_matrix
+          call netCDF_writeOUTPUT(output_filename_hr, "SoilMoistPot", psi_soil_matrix, tot_hour/24.0, step_nc_hr)
+          
           step_nc_hr= step_nc_hr+1 
         endif
         
@@ -309,7 +347,7 @@ program SVMC
         ! Cumulative solar radiation (energy)
 
         
-        !if ((mod(tot_hour,24) .eq. 0).and.(tot_hour .gt. 0)) then    ! here assume the start time is always the beginning of the day!
+        if ((mod(tot_hour,24.0) .eq. 0).and.(tot_hour .gt. 0)) then    ! here assume the start time is always the beginning of the day!
           !Update GDD which is the criteria for phenology stages         
         !  gdd_sum= gdd_sum+temp_day/24.....
         !  temp_day=0
@@ -354,13 +392,13 @@ program SVMC
           ! nee_day= .......
 
           ! Write output for daily variables
-      !    if(step_nc_day.eq.0)then
+          if(step_nc_day.eq.0)then
             !Initialize netcdf file
-      !      call netCDF_prepareOUTPUT(output_filename_day, lon_sites, lat_sites, ntim_out_day)
-      !    end if
+            call netCDF_prepareOUTPUT(output_filename_day, lon_sites, lat_sites, ntim_out_day)
+          end if
 
-      !    call netCDF_writeOUTPUT(output_filename_day, "HeteroResp", hr, tot_hour/24, step_nc_day)           
-      !    step_nc_day= step_nc_day+1                
+         ! call netCDF_writeOUTPUT(output_filename_day, "HeteroResp", hr, tot_hour/24, step_nc_day)           
+         ! step_nc_day= step_nc_day+1                
 
       !    gpp_sum_day =0
       !    npp_sum_day =0
@@ -383,7 +421,7 @@ program SVMC
       !    npp_sum_year=0
       !    gdd_sum=0  
 
-      !  end if
+        end if
 
       end do ! m
     end do  !i
