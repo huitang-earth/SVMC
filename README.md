@@ -18,6 +18,7 @@
 - To set the parameters of p-hydro, please check `readvegpara_mod.f90` at [here](https://github.com/huitang-earth/SVMC/blob/9738c7a5dc576ad472d9b5fc4664d79b576b7891/src/readvegpara_mod.f90#L147-L161)
 - To set the parameters related spafhy, please check both `readvegpara_mod.f90` at [here](https://github.com/huitang-earth/SVMC/blob/9738c7a5dc576ad472d9b5fc4664d79b576b7891/src/readvegpara_mod.f90#L167-L192) and 'readsoilpara_mod.f90' at [here](https://github.com/huitang-earth/SVMC/blob/9738c7a5dc576ad472d9b5fc4664d79b576b7891/src/readsoilpara_mod.f90#L138-L155) here.
 - The input and output subroutines with netcdf are kept in `io_mod.f90`. If you want to add more output data into the output netcdf file, please define the variable [here](https://github.com/huitang-earth/SVMC/blob/9738c7a5dc576ad472d9b5fc4664d79b576b7891/src/io_mod.f90#L73-L198) in `io_mod.f90` and call the writing variable subroutine in `SVMC.f90`[here](https://github.com/huitang-earth/SVMC/blob/9738c7a5dc576ad472d9b5fc4664d79b576b7891/src/SVMC.f90#L316-L328). 
+- Input and Output are both kept in the `data` folder [here](https://github.com/huitang-earth/SVMC/tree/spafhy_test/data)
 
 ## Additional notes:
 - Namelist files are implemented in the code, but have not be tested yet. So, **you need to change parameters in the code and re-compile the model** when doing testing. 
