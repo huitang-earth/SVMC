@@ -61,8 +61,8 @@ MODULE readvegpara_mod
   !------------------------------------
   
   ! canopy interception
-  real(8)            :: kv = 0.4  ! von Karman constant (-)
-  real(8)            :: beta_aero=285.0   ! s/m, from Campbell & Norman eq. (7.33) x 42.0 molm-3
+  ! real(8) :: kv = 0.4  ! von Karman constant (-) ! moved to spafhy_mod
+  ! real(8) :: beta_aero=285.0   ! s/m, from Campbell & Norman eq. (7.33) x 42.0 molm-3 ! moved to spafhy_mod
   real(8) :: wmax     ! storage capacity for rain (mm/LAI), Hui: this is too much compared to CTSM
   real(8) :: wmaxsnow ! storage capacity for snow (mm/LAI), Hui: this is reasonable
 
@@ -170,7 +170,7 @@ contains
     ! LAI is annual maximum LAI and for gridded simulations are input from GisData!
     ! keys must be 'LAI_ + key in spec_para
     hc = 0.6         ! canopy height (m)
-    cf = 0.6          ! canopy closure fraction (-)
+    !cf = 0.6          ! canopy closure fraction (-) LET's omit for simplicity!!
     w_leaf=0.01       !leaf length scale (m)
 
     ! canopy conductance                     

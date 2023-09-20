@@ -86,11 +86,14 @@ program SVMC
   real(8)    :: chi_jmax_lim      ! Analytical chi in the case of strong Jmax limitation
   real(8)    :: gpp
   real(8)    :: tr_phydro   ! Transpiration estimated by p-hydro model
+  real(8)    :: LE          ! latent heat flux (Wm-2)
 
   ! spafhy variables
   real(8)    :: tr_spafhy   ! Transpiration estimated by spafhy model
   real(8)    :: retflow     ! return flow from ground water [m]
-  
+  real(8)    :: LE          ! latent heat flux [Wm-2]
+  real(8)    :: LatentHeat  ! latent heat of vaporization [J kg-1]
+
   ! For soil water retention curve
  ! real(8) :: watsat      ! v/v saturate moisture
   !real(8) :: watres      ! v/v, residual soil moisture for Van Genuchten
@@ -214,7 +217,7 @@ program SVMC
                        sh_matrix, rh_matrix, vpd_matrix, pres_matrix, &
                        co2_matrix, wind_matrix, step_clim)
 
-          temp=temp_matrix(1,1,1)
+          temp=temp_matrix(1,1,1) ! deg C or K???
           ppfd=ppfd_matrix(1,1,1)
           rg  = rg_matrix(1,1,1)
           prec=prec_matrix(1,1,1)
@@ -245,7 +248,8 @@ program SVMC
           print *, "fapar =", fapar                      ! frac
           !print *, "vol_liq =", vol_liq
           print *, "psi_soil =", psi_soil*0.001          ! convert from Kpa to MPa
-
+          
+          ! for coupling with SpaFHy: psi_soil = soilwater_state%Psi
           call pmodel_hydraulics_numerical(temp-273.15, ppfd*1000000.0/lai, vpd, co2*1000000, pres, fapar, &
                                  psi_soil*0.001, rdark,                                                 &
                                  jmax, dpsi, gs, aj, ci, chi, vcmax, profit, chi_jmax_lim            &
@@ -258,36 +262,49 @@ program SVMC
           ! Carbon allocation: update gpp, npp, ar ....
           ! call carbon_allocation_hr(a,....)          
         
-          ! Update transpiration, canopy evaporation...
-          ! CanopyGrid in spafhy...
-          ! in mm/s H20
+          ! Solve plant canopy and soil water budget
+          
           ! Transpiration derived from P-hydro
-
-          tr_phydro = 1.6*gs*(vpd/pres)*h2o_molmass/density_h2o(temp-273.15, pres)     
+          ! HUI - check units of gs and conversion to tr_phydro. We want it to be [mm s-1 = kg H2O m-2 s-1] 
+          ! [tr_phydro] = [1] * [??] * [Pa Pa-1] * [kg mol-1] / [kg m-3] 
+          tr_phydro = 1.6*gs*(vpd/pres)*h2o_molmass/density_h2o(temp-273.15, pres)
+          
+          ! net radiation of the whole canopy-soil system [W m-2]
+          ! Samuli will revise later!
           rn= rg * 0.7
           !rn = max(2.57*lai/(2.57*lai+0.57)-0.2, 0.55)*rg  ! Launiainen et al. 2016 GCB, fit to Fig 2a
 
-          call canopy_water_flux(gs, rn, temp-273.15, prec, ppfd, vpd,  &
-                                  wind, co2*1000000, soilwater_state%Rew, & 
-                                  pres, lai, canopywater_state, snowwater_state)       
+          !call canopy_water_flux(gs, rn, temp-273.15, prec, ppfd, vpd,  &
+          !                        wind, co2*1000000, soilwater_state%Rew, & 
+          !                        pres, lai, canopywater_state, snowwater_state)       
           
-          ! Everything is in the unit of mm/s, no need to multiply dt?
-          canopywater_state%ET =  tr_phydro +  canopywater_state%Efloor +     &
-                                      canopywater_state%Evap/(time_step*3600.0)
+          ! call SpaFHy code to compute new canopywater_state and snowwater_state
+          ! returns water fluxes integrated over time_step in units [mm = kg H2O m-2]
+          call canopy_water_flux(rn, temp-273.15, prec, vpd, wind, press, fapar, lai, &
+                                  canopywater_state, snowwater_state, soilwater_state)
 
+          ! ET [mm]
+          canopywater_state%ET =  tr_phydro * (time_step*3600.0) +  canopywater_state%GroundEvap + &
+                                      canopywater_state%CanopyEvap
+          
+          LatentHeat = 1.0e3 * (3147.5 - 2.37 * (temp))
+          LE = canopywater_state%ET / (time_step * 3600.0) * LatentHeat ! Wm-2
+
+          ! Solve soil water balance
+
+          !tr_spafhy=tr_phydro*(time_step*3600.0*1.0e-3)
           retflow=0.0
-          tr_spafhy=tr_phydro*(time_step*3600.0*1.0e-3)
+          ! water fluxes must be in units [m]. Updates soilwater_state, including soilwater_state%Psi.
           call soil_water(soilwater_state, snowwater_state%PotInf*1.0e-3, &
-                          tr_spafhy,  &
-                          canopywater_state%Efloor*(time_step*3600.0*1.0e-3), retflow)  
+                          tr_phydro*(time_step*3600.0*1.0e-3),  &
+                          canopywater_state%GroundEvapfloor*1.0e-3, retflow)  
 
-          call soil_water_retention_curve(soilwater_state%Wliq, psi_soil_spafhy) 
+          !call soil_water_retention_curve(soilwater_state%Wliq, psi_soil_spafhy) 
 
         !end if  !phenology
         
         ! Calculation of NEE & LATENT heat flux
         ! nee= gpp-ar-hr
-        ! et = tr+evap_can(temp, rad)+evap_soil(temp, rad)
 
         ! Write hourly output at output time step frequency
 
@@ -309,7 +326,8 @@ program SVMC
           dpsi_matrix(1,1,1)  =dpsi
           profit_matrix(1,1,1)=profit
           soilmoist1_matrix(1,1,1)=soilwater_state%Wliq
-          psi_soil_matrix(1,1,1)=psi_soil_spafhy
+          !psi_soil_matrix(1,1,1)=psi_soil_spafhy
+          psi_soil_matrix(1,1,1)=soilwater_state%Psi ! MPa
           evap_matrix(1,1,1)=canopywater_state%ET
           print *, "step_nc_hr=", step_nc_hr
 

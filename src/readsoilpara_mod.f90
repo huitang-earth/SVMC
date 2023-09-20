@@ -2,48 +2,52 @@ MODULE readsoilpara_mod
 
 implicit none
   type, public :: soilwater_type
-    real(8)  :: PondSto
-    real(8)  :: inflow  ! [m] - total inflow to root zone
-    real(8)  :: roff    ! [m] - surface runoff
-    real(8)  :: drain   ! [m] - drainage from root zone
-    real(8)  :: Interc     ! interception of top layer (mm)
-    real(8)  :: WatSto
-    real(8)  :: MaxWatSto
-    real(8)  :: WatStoTop
-    real(8)  :: MaxStoTop
-    real(8)  :: Wliq
-    real(8)  :: Wliq_top
-    real(8)  :: Sat
-    real(8)  :: Rew
+    real(8)  :: PondSto ! [m] - pond storage
+    real(8)  :: Inflow  ! [m] - total inflow to root zone during timestep
+    real(8)  :: Roff    ! [m] - surface runoff -"-
+    real(8)  :: Drain   ! [m] - drainage from root zone -"-
+    real(8)  :: Interc  ! [m] - interception of top layer -"-
+    real(8)  :: WatSto  ! [m] - root zone storage
+    real(8)  :: MaxWatSto ! [m] - root zone storage capacity
+    real(8)  :: WatStoTop ! [m] - top layer storage
+    real(8)  :: MaxStoTop ! [m] - top layer storage capacity
+    real(8)  :: Wliq      ! [m3 m-3] - root zone water content
+    real(8)  :: Wliq_top  ! [m3 m-3] - top layer water content
+    real(8)  :: Psi  ! water potential, root zone (MPa)
+    real(8)  :: PsiTop  ! water potential, organic top layer (MPa)
+    real(8)  :: Sat   ! saturation ratio (-), root zone
+    real(8)  :: Kh   ! Hydraulic conductivity at Sat [m s-1]
+    real(8)  :: beta  ! modifier for soil evaporation rate, WliqTop/FCtop
+
     real(8)  :: mbe     ! [m] - mass balance error
   end type soilwater_type
 
   type, public :: canopywater_type
-    real(8):: h2o
-    real(8):: Trfall     ! throughfall to snow / soil surface (mm)
+    real(8):: CanopyStorage  ! canopy water storage (mm = kg m-2(ground)) 
+    real(8):: Trfall     ! throughfall to snow / soil surface (mm, during timestep)
     real(8):: Interc     ! interception of canopy (mm)
-    real(8):: Evap       ! evaporation / sublimation from canopy store (mm)
+    real(8):: CanopyEvap ! evaporation / sublimation from canopy store (mm)
     real(8):: Unload     ! undloading from canopy storage (mm)    
-    real(8):: Efloor     ! forest floor evaporation rate (mm s-1)
+    real(8):: GroundEvap ! evaporation from ground (mm)
     real(8):: MBE        ! mass balance error (mm)      
-    real(8):: ET         ! total evapo-transpiration
-    !real(8):: Transpi    ! transpiration rate (mm s-1)  
+    real(8):: ET         ! total evapo-transpiration (mm)
+    real(8):: Transpi    ! transpiration rate (mm)  
   end type canopywater_type
 
   type, public :: snowwater_type
-    real(8):: swe    
-    real(8):: SWEi    
-    real(8):: SWEl   
+    real(8):: swe        ! [mm] snow water equivalent
+    real(8):: SWEi      ! [mm] snow water equivalent as ice
+    real(8):: SWEl     ! [mm] snow water equivalent as liquid
     real(8):: PotInf     ! potential infiltration to soil profile (mm)            
   end type snowwater_type
 
 ! Soil hydraulic properties for spafhy
   real(8) :: soil_depth    ! root zone depth (m)
-  real(8) :: max_poros     ! porosity (-)
-  real(8) :: fc            ! field capacity (-)
-  real(8) :: wp            ! wilting point (-)
-  real(8) :: ksat        ! conductivity at saturation point
-  real(8) :: beta           !  term for soil evaporation resistance (Wliq/FC) [-]
+  real(8) :: max_poros     ! [m3 m-3], porosity
+  real(8) :: fc            ! [m3 m-3], field capacity. For consistency, must be computed from soil water retention curve at Psi= xx KPa
+  real(8) :: wp            ! [m3 m-3], wilting point. For consistency, must be computed from soil water retention curve at Psi=xx KPa
+  real(8) :: ksat          ! [m s-1], saturated hyd, conductivity
+  real(8) :: beta          ! [-], term for soil evaporation resistance (Wliq/FC). THIS IS in soilwater_state%beta
 
   ! organic (moss) layer
   real(8) :: org_depth     ! depth of organic top layer (m)
@@ -65,43 +69,6 @@ implicit none
   real(8) :: alpha_van   !Launiainen et al. 2022: C1-5: 4.45, 5.92, 2.02, 4.49, 3.35
   real(8) :: watsat  !Launiainen et al. 2022: C1-5: 0.75, 0.68, 0.46, 0.47, 0.54  
 
-  
-  
-  !----------------------------
-  ! Soil properties for yasso
-  !-----------------------------
-  !real(r8), parameter :: days_yr = 365.0
-  !integer, parameter, public :: statesize_yasso = 5
-
-! The yasso parameter vector:
-! 1-16 matrix A entries: 4*alpha, 12*p
-! 17-21 Leaching parameters: w1,...,w5 IGNORED IN THIS FUNCTION
-! 22-23 Temperature-dependence parameters for AWE fractions: beta_1, beta_2
-! 24-25 Temperature-dependence parameters for N fraction: beta_N1, beta_N2
-! 26-27 Temperature-dependence parameters for H fraction: beta_H1, beta_H2
-! 28-30 Precipitation-dependence parameters for AWE, N and H fraction: gamma, gamma_N, gamma_H
-! 31-32 Humus decomposition parameters: p_H, alpha_H (Note the order!)
-! 33-35 Woody parameters: theta_1, theta_2, r 
-
-! The Yasso20 maximum a posteriori parameters:
-  !integer, public :: num_params_y20
-  !real, public :: param_y20_map(num_params_y20)
-
-  ! Nitrogen-specific parameters
-  !real, public :: nc_mb ! N-C ratio of the microbial biomass 
-  !real, public :: cue_min  ! minimum microbial carbon use efficiency
-  !real, public :: nc_h_max ! N-C ratio of the H pool
-
-  ! AWENH composition from Palosuo et al. (2015), for grasses. For now, we'll use the same
-  ! composition for both above and below ground inputs. The last values (H) are always 0.
-  !real :: awenh_fineroot(statesize_yasso)
-  !real :: awenh_leaf(statesize_yasso)
-  ! A soil amendment consisting of soluble carbon (and nitrogen)
-  !real :: awenh_soluble(statesize_yasso)
-  ! From Heikkinen et al 2021, composted horse manure with straw litter
-  !real :: awenh_compost(statesize_yasso)
-
-  !integer, parameter, public :: met_ind_init = 1
 
 contains
 
@@ -136,11 +103,11 @@ contains
     old=.false.
   ! Presetting namelist command
     soil_depth=0.4
-    max_poros =0.46           ! should be equivalent to watsat here.
-    fc=0.36                   ! based on C3 in Launiainen et al. 2022
-    wp=0.22
+    max_poros=0.46           ! should be equivalent to watsat here.
+    fc=0.36                   ! based on C3 in Launiainen et al. 2022 ! Must be computed from water-retention curve
+    wp=0.22     ! Must be computed from water-retention curve
     ksat=2.0e-6
-    beta=4.7            ! default 
+    !beta=4.7            ! default 
     org_depth=0.04
     org_poros=0.9
     org_fc=0.3        
@@ -243,3 +210,38 @@ contains
 
 END MODULE readsoilpara_mod
 
+!----------------------------
+  ! Soil properties for yasso
+  !-----------------------------
+  !real(r8), parameter :: days_yr = 365.0
+  !integer, parameter, public :: statesize_yasso = 5
+
+! The yasso parameter vector:
+! 1-16 matrix A entries: 4*alpha, 12*p
+! 17-21 Leaching parameters: w1,...,w5 IGNORED IN THIS FUNCTION
+! 22-23 Temperature-dependence parameters for AWE fractions: beta_1, beta_2
+! 24-25 Temperature-dependence parameters for N fraction: beta_N1, beta_N2
+! 26-27 Temperature-dependence parameters for H fraction: beta_H1, beta_H2
+! 28-30 Precipitation-dependence parameters for AWE, N and H fraction: gamma, gamma_N, gamma_H
+! 31-32 Humus decomposition parameters: p_H, alpha_H (Note the order!)
+! 33-35 Woody parameters: theta_1, theta_2, r 
+
+! The Yasso20 maximum a posteriori parameters:
+  !integer, public :: num_params_y20
+  !real, public :: param_y20_map(num_params_y20)
+
+  ! Nitrogen-specific parameters
+  !real, public :: nc_mb ! N-C ratio of the microbial biomass 
+  !real, public :: cue_min  ! minimum microbial carbon use efficiency
+  !real, public :: nc_h_max ! N-C ratio of the H pool
+
+  ! AWENH composition from Palosuo et al. (2015), for grasses. For now, we'll use the same
+  ! composition for both above and below ground inputs. The last values (H) are always 0.
+  !real :: awenh_fineroot(statesize_yasso)
+  !real :: awenh_leaf(statesize_yasso)
+  ! A soil amendment consisting of soluble carbon (and nitrogen)
+  !real :: awenh_soluble(statesize_yasso)
+  ! From Heikkinen et al 2021, composted horse manure with straw litter
+  !real :: awenh_compost(statesize_yasso)
+
+  !integer, parameter, public :: met_ind_init = 1
