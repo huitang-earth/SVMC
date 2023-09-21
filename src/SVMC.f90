@@ -86,7 +86,6 @@ program SVMC
   real(8)    :: chi_jmax_lim      ! Analytical chi in the case of strong Jmax limitation
   real(8)    :: gpp
   real(8)    :: tr_phydro   ! Transpiration estimated by p-hydro model
-  real(8)    :: LE          ! latent heat flux (Wm-2)
 
   ! spafhy variables
   real(8)    :: tr_spafhy   ! Transpiration estimated by spafhy model
@@ -280,7 +279,7 @@ program SVMC
           
           ! call SpaFHy code to compute new canopywater_state and snowwater_state
           ! returns water fluxes integrated over time_step in units [mm = kg H2O m-2]
-          call canopy_water_flux(rn, temp-273.15, prec, vpd, wind, press, fapar, lai, &
+          call canopy_water_flux(rn, temp-273.15, prec, vpd, wind, pres, fapar, lai, &
                                   canopywater_state, snowwater_state, soilwater_state)
 
           ! ET [mm]
@@ -292,12 +291,12 @@ program SVMC
 
           ! Solve soil water balance
 
-          !tr_spafhy=tr_phydro*(time_step*3600.0*1.0e-3)
+          tr_spafhy=tr_phydro*(time_step*3600.0*1.0e-3)   ! This variable has to be used to be modified in soil_water
           retflow=0.0
           ! water fluxes must be in units [m]. Updates soilwater_state, including soilwater_state%Psi.
           call soil_water(soilwater_state, snowwater_state%PotInf*1.0e-3, &
-                          tr_phydro*(time_step*3600.0*1.0e-3),  &
-                          canopywater_state%GroundEvapfloor*1.0e-3, retflow)  
+                          tr_spafhy,  &
+                          canopywater_state%GroundEvap*1.0e-3, retflow)  
 
           !call soil_water_retention_curve(soilwater_state%Wliq, psi_soil_spafhy) 
 

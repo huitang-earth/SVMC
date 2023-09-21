@@ -31,7 +31,7 @@ MODULE spafhy_mod
   private :: penman_monteith      !
   private :: e_sat                !
   private :: set_soilwaterState   !
-  private :: hydrCond             ! 
+  !private :: hydrCond             ! 
   !private :: relative_evaporation !
 
 contains
@@ -227,11 +227,11 @@ contains
 
     ! Calculate canopy interception, canopy evaporation, snowpack dynamics, ground evaporation
     AE = Rn * fapar
-    call canopy_water_snow(canopywater_state, snowwater_state, Ta, Prec, AE, VPD, Ra, LAI, P)
+    call canopy_water_snow(canopywater_state, snowwater_state, Ta, Prec, AE, VPD, Ra, U, LAI, P)
 
     ! Calculate soil evaporation rate
     AE = Rn * (1 - fapar)
-    call ground_evaporation(canopywater_state, snowwater_state, soil_water_state, Ta, AE, VPD, Ras, P)
+    call ground_evaporation(canopywater_state, snowwater_state, soilwater_state, Ta, AE, VPD, Ras, P)
 
   END SUBROUTINE canopy_water_flux
 
@@ -246,9 +246,9 @@ contains
     real(8)      , intent(in)    :: VPD    ! vapor pressure deficit (Pa)
     real(8)      , intent(in)    :: Ras     ! ground aerodynamic resistance (s m-1)
     real(8)      , intent(in)    :: P      ! pressure [Pa], scalar or matrix
-    type(canopywater_type), intent(in)   :: canopywater_state
     type(snowwater_type), intent(in)   :: snowwater_state
     type(soilwater_type), intent(in)   :: soilwater_state  ! soilwater state (for ground evaporation)
+    type(canopywater_type), intent(inout)   :: canopywater_state
 
     ! ! Local variables 
     real(8)     ::    Lv, erate, Gas
@@ -264,18 +264,20 @@ contains
     if (snowwater_state%swe>0) then
       canopywater_state%GroundEvap = 0.0  ! no evaporation from floor if snow on ground
     end if
-    
-  SUBROUTINE canopy_water_snow(canopywater_state, snowwater_state, T, Pre, AE, D, Ra, LAI, P)
+  END SUBROUTINE ground_evaporation
+
+  SUBROUTINE canopy_water_snow(canopywater_state, snowwater_state, T, Pre, AE, D, Ra, U, LAI, P)
     !
     ! Calculates canopy interception, throughfall and snowpack change during timestep dt
     ! Updates canopy and snow storages
 
     ! !ARGUMENTS:
     real(8)      , intent(in)    :: T      ! air temperature [deg C]
-    real(8)      , intent(in)    :: Pre   ! precipitation rate during [mm s-1]
+    real(8)      , intent(in)    :: Pre    ! precipitation rate during [mm s-1]
     real(8)      , intent(in)    :: AE     ! available energy (~net radiation) [W m-2]
     real(8)      , intent(in)    :: D      ! vapor pressure deficit [Pa]
     real(8)      , intent(in)    :: Ra     ! canopy aerodynamic resistance [s m-1]
+    real(8)      , intent(in)    :: U      ! mean wind speed at ref. height above canopy top [ms-1]
     real(8)      , intent(in)    :: LAI    ! leaf area index [m2 m-2]
     real(8)      , intent(in)    :: P      ! pressure [Pa]
     type(canopywater_type), intent(inout)   :: canopywater_state
@@ -356,7 +358,7 @@ contains
     ! Above Tmin, interception capacity equals that of liquid precip
     if (T >= Tmin) then
       canopywater_state%Interc = max(0.0, (wmax_tot - canopywater_state%CanopyStorage)) &
-                * (1.0 - exp(-Prec/wmax_tot)))
+                * (1.0 - exp(-Prec/wmax_tot))
     end if
 
     ! update canopy storage after interception
@@ -365,7 +367,7 @@ contains
 
     ! evaporate from canopy and update storage
     canopywater_state%CanopyEvap = min(erate,  canopywater_state%CanopyStorage)  ! mm
-    canopywater_state%CanopyStorage = canopywater_state%CanopyStorage - canopywater_state%Evap
+    canopywater_state%CanopyStorage = canopywater_state%CanopyStorage - canopywater_state%CanopyEvap
 
     !---- Snowpack (in case no snow, all Trfall routed to floor) """
     if (T >= Tmelt) then
@@ -389,7 +391,7 @@ contains
         
     ! mass-balance error mm
     canopywater_state%MBE = (canopywater_state%CanopyStorage + snowwater_state%swe) - & 
-                               (Wo + SWEo) - (Prec - canopywater_state%Evap - & 
+                               (Wo + SWEo) - (Prec - canopywater_state%CanopyEvap - & 
                                snowwater_state%PotInf)
 
   END SUBROUTINE canopy_water_snow
@@ -475,13 +477,13 @@ contains
     !character (*), intent(in) :: units          ! W (Wm-2), mm (mms-1=kg m-2 s-1), mol (mol m-2 s-1)
 
     ! !LOCAL VARIABLES:
-    real(8)             :: cp, rho, Mw, s, g, esat, L, P
+    real(8)             :: cp, rho, Mw, s, g, esat, L !P
 
     ! --- constants
     cp = 1004.67  ! J kg-1 K-1
     rho= 1.25    ! kg m-3
     Mw = 18e-3    ! kg mol-1
-    P = 10130.0  ! standard sea-level pressure (Pa)
+    !P = 10130.0  ! standard sea-level pressure (Pa)
   
     call e_sat(T, P, s, g, esat)  ! slope of sat. vapor pressure, psycrom const
 
