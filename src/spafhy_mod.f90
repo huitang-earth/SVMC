@@ -50,8 +50,9 @@ contains
 
     call set_soilwaterState(soilwater_state)
 
+    ! canopywater
     canopywater_state%CanopyStorage=0.0
-    
+
     snowwater_state%swe=0.0
     snowwater_state%SWEi=0.0
     snowwater_state%SWEl=0.0
@@ -157,17 +158,7 @@ contains
   END SUBROUTINE soil_water
 
   SUBROUTINE soil_water_retention_curve(vol_liq, smp)
-  !
-  ! !DESCRIPTION:
-  ! Two steps: 
-  !    1- compute hydraulic properties based on functions derived 
-  !       from Table 5 in cosby et al, 1984 (Based on CTSM: )
-  !    2- Compute soil suction potential from soil water storage
-  !       Implementation of soil_water_retention_curve_type using different approaches
-  !        -  Clapp-Hornberg 1978 parameterizations (Based on CTSM: )
-  !        -  Van Genuchten 1980 parameterizations (Based on CTSM-FATES:)
-  !             -  Use parameters derived from Launiainen et al. 2022 
-  ! !ARGUMENTS:
+  ! converts vol. water content to soil water potential (in MPa)
 
     implicit none
     real(8), intent(in) :: vol_liq        ! v/v, volumetric of liq in soil bucket
@@ -184,17 +175,18 @@ contains
     real(8) :: eff_porosity! v/v, volume of ice
     
   !--- Van Genuchten scheme based on FatesHydro (parameters from Launiainen et al. Forests, 2022)
-  ! MOVE TO PARAMETERS!!!
-    n1=n_van       !Launiainen et al. 2022: C1-5: 1.12, 1.14, 1.07, 1.27, 1.18  
+  ! MOVE TO PARAMETERS - reading alpha_sat from namelist does not work!!!
+    n1= 1.07 !n_van       !Launiainen et al. 2022: C1-5: 1.12, 1.14, 1.07, 1.27, 1.18  
     m1=1.0/n1  
     alpha_van=2.02   !Launiainen et al. 2022: C1-5: 4.45, 5.92, 2.02, 4.49, 3.35
     watsat=0.46  !Launiainen et al. 2022: C1-5: 0.75, 0.68, 0.46, 0.47, 0.54  
-
+  
     vol_ice = 0.0  
-    eff_porosity = max(0.01, watsat-vol_ice)
+    eff_porosity = max(0.01, watsat - vol_ice)
     
     satfrac = (vol_liq-watres)/(eff_porosity-watres)
-    smp = -(1.0/alpha_van)*(satfrac**(1.0/(m1-1.0)) - 1.0 )**m1
+    smp = -(1.0/alpha_van)*(satfrac**(1.0/(m1-1.0)) - 1.0 )**m1 !kPa
+    smp = smp * 0.001 !MPa
 
   END SUBROUTINE soil_water_retention_curve
 
@@ -231,6 +223,8 @@ contains
 
     ! Calculate soil evaporation rate
     AE = Rn * (1 - fapar)
+    print *, "fapar=", fapar
+
     call ground_evaporation(canopywater_state, snowwater_state, soilwater_state, Ta, AE, VPD, Ras, P)
 
   END SUBROUTINE canopy_water_flux
@@ -251,17 +245,17 @@ contains
     type(canopywater_type), intent(inout)   :: canopywater_state
 
     ! ! Local variables 
-    real(8)     ::    Lv, erate, Gas
+    real(8)     ::    Lv, erate, Gas, eps=1E-16
     Lv = 1.0e3 * (3147.5 - 2.37 * (T + 273.15))
     Gas = 1 / Ras
     ! gsoil is soil surface conductance when fully wet, defined in readvegpara
 
     erate = (time_step * 3600) * soilwater_state%beta * penman_monteith(AE, VPD, T, gsoil, Gas, P) / Lv ! mm
-    
-    ! maximum equals available water 
-    canopywater_state%GroundEvap = min(soilwater_state%WatStoTop, erate)
 
-    if (snowwater_state%swe>0) then
+    ! maximum equals available water 
+    canopywater_state%GroundEvap = min(1e3*soilwater_state%WatStoTop, erate)
+
+    if (snowwater_state%swe>eps) then
       canopywater_state%GroundEvap = 0.0  ! no evaporation from floor if snow on ground
     end if
   END SUBROUTINE ground_evaporation
@@ -343,7 +337,7 @@ contains
     ! HT: (1) unloading first at each timestep? (2) why no snow unload? do we need it here?
     ! SL: below describes snow unloading. If T > Tmin, maximum storage is  that of liquid water.
     if (T >= Tmin) then
-      canopywater_state%Unload = max(canopywater_state%CanopyStorage  - wmax_tot, 0.0)
+      canopywater_state%Unload = max(canopywater_state%CanopyStorage - wmax_tot, 0.0)
       canopywater_state%CanopyStorage = canopywater_state%CanopyStorage - canopywater_state%Unload
     end if
 
@@ -366,14 +360,16 @@ contains
     canopywater_state%Trfall = Prec + canopywater_state%Unload - canopywater_state%Interc  ! Throughfall to field layer or snowpack
 
     ! evaporate from canopy and update storage
-    canopywater_state%CanopyEvap = min(erate,  canopywater_state%CanopyStorage)  ! mm
+    canopywater_state%CanopyEvap = min(erate,  canopywater_state%CanopyStorage + eps)  ! mm
     canopywater_state%CanopyStorage = canopywater_state%CanopyStorage - canopywater_state%CanopyEvap
 
     !---- Snowpack (in case no snow, all Trfall routed to floor) """
     if (T >= Tmelt) then
       Melt = min(snowwater_state%SWEi, kmelt * (time_step*3600) * (T - Tmelt))  ! mm
+      Freeze = 0.0
     else if (T < Tmelt) then
       Freeze = min(snowwater_state%SWEl, kfreeze * (time_step*3600) * (Tmelt - T))  ! mm
+      Melt = 0.0
     end if
 
     !---- amount of water as ice and liquid in snowpack

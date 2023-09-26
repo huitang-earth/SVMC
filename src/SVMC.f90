@@ -41,6 +41,9 @@ program SVMC
   real(8), dimension(1)    :: start_lai_time, end_lai_time 
   integer         :: ntim_clim, ntim_lai, ntim_out_hr, ntim_out_day
  
+  ! epsilon
+  real(8) :: eps = 1e-16
+
   !***********************************
   !Model variables
   !***********************************
@@ -164,7 +167,15 @@ program SVMC
   step_clim = floor((start_date-start_clim_juldate)*24)+1
   step_lai  = floor(start_date-start_lai_juldate)+1
 
-  print *, num_sites, lat_sites, lon_sites, tot_hour, num_pft   
+  print *, num_sites, lat_sites, lon_sites, tot_hour, num_pft
+
+  !********* open file for writing SpaFHy test outputs
+  open(99, file = 'logbook.txt', status = 'old')
+  write(99,*) "prec,T,Wliq,WliqTop,PsiS,Mbe,tr_spafhy,ground_evap,infil,drain,roff,pondsto,swe,&
+      &swe_l,swe_i,canopy_evap,canopy_mbe,CanopyStorage,Trfall,LE"
+  
+  !*******************
+  
   ! Loop over time, and locations
   do while (tot_hour .lt. tot_hour_end)  ! in hour or 30 minutes, time loop 
     
@@ -189,7 +200,7 @@ program SVMC
             lai=lai_matrix(1,1,1)
             soilmoist=soilmoist_matrix(1,1,1)             
             
-            call soil_water_retention_curve(soilmoist, psi_soil)
+            !call soil_water_retention_curve(soilmoist, psi_soil)
             ! add soil rentention curve here to test soil water potential calculation
             !n1=1.07       !Launiainen et al. 2022: C1-5: 1.12, 1.14, 1.07, 1.27, 1.18  
             !m1=1.0/n1  
@@ -233,6 +244,9 @@ program SVMC
           ! run phydro to estimate photosynthetic rate (a) and stomatal conductance (gs)
           ! At what time scale the optimization should work need to be tested!!!!
           
+          !psi_soil = -1.0
+          psi_soil = soilwater_state%Psi !root zone, MPa
+          !psi_soil = min(-eps, max(psi_soil, -2.0))  ! ensures psi_soil <0 and >-2.0 MPa
           rdark=0.0
 
           print *, "temp =", temp-273.15                  ! unit should be C
@@ -246,11 +260,11 @@ program SVMC
           print *, "pres =", pres                        ! pa
           print *, "fapar =", fapar                      ! frac
           !print *, "vol_liq =", vol_liq
-          print *, "psi_soil =", psi_soil*0.001          ! convert from Kpa to MPa
+          print *, "psi_soil =", psi_soil         ! MPa
           
           ! for coupling with SpaFHy: psi_soil = soilwater_state%Psi
           call pmodel_hydraulics_numerical(temp-273.15, ppfd*1000000.0/lai, vpd, co2*1000000, pres, fapar, &
-                                 psi_soil*0.001, rdark,                                                 &
+                                 psi_soil, rdark,                                                 &
                                  jmax, dpsi, gs, aj, ci, chi, vcmax, profit, chi_jmax_lim            &
                                  )
           
@@ -306,6 +320,15 @@ program SVMC
         ! nee= gpp-ar-hr
 
         ! Write hourly output at output time step frequency
+
+        ! *** test output for de-bugging
+        write(99,'(*(G0.6,:,","))') & 
+        prec, temp - 273.15, soilwater_state%Wliq, soilwater_state%Wliq_top, &
+        soilwater_state%Psi, soilwater_state%mbe, tr_spafhy, &
+        canopywater_state%GroundEvap*1.0e-3, soilwater_state%Inflow, soilwater_state%Drain, soilwater_state%Roff, &
+        soilwater_state%PondSto, snowwater_state%swe, snowwater_state%SWEl, snowwater_state%SWEi, &
+        canopywater_state%CanopyEvap*1e-3, &
+        canopywater_state%MBE, canopywater_state%CanopyStorage, canopywater_state%Trfall, LE
 
         if ( mod(tot_hour,time_step_output) .eq. 0.0 ) then
             

@@ -23,22 +23,22 @@ implicit none
   end type soilwater_type
 
   type, public :: canopywater_type
-    real(8):: CanopyStorage  ! canopy water storage (mm = kg m-2(ground)) 
-    real(8):: Trfall     ! throughfall to snow / soil surface (mm, during timestep)
-    real(8):: Interc     ! interception of canopy (mm)
-    real(8):: CanopyEvap ! evaporation / sublimation from canopy store (mm)
-    real(8):: Unload     ! undloading from canopy storage (mm)    
-    real(8):: GroundEvap ! evaporation from ground (mm)
-    real(8):: MBE        ! mass balance error (mm)      
-    real(8):: ET         ! total evapo-transpiration (mm)
-    real(8):: Transpi    ! transpiration rate (mm)  
+    real(8) :: CanopyStorage = 0.0 ! canopy water storage (mm = kg m-2(ground)) 
+    real(8) :: Trfall = 0.0    ! throughfall to snow / soil surface (mm, during timestep)
+    real(8) :: Interc = 0.0    ! interception of canopy (mm)
+    real(8) :: CanopyEvap = 0.0 ! evaporation / sublimation from canopy store (mm)
+    real(8) :: Unload = 0.0    ! undloading from canopy storage (mm)    
+    real(8) :: GroundEvap = 0.0 ! evaporation from ground (mm)
+    real(8) :: MBE = 0.0       ! mass balance error (mm)      
+    real(8) :: ET = 0.0        ! total evapo-transpiration (mm)
+    real(8) :: Transpi = 0.0   ! transpiration rate (mm)  
   end type canopywater_type
 
   type, public :: snowwater_type
-    real(8):: swe        ! [mm] snow water equivalent
-    real(8):: SWEi      ! [mm] snow water equivalent as ice
-    real(8):: SWEl     ! [mm] snow water equivalent as liquid
-    real(8):: PotInf     ! potential infiltration to soil profile (mm)            
+    real(8) :: swe        ! [mm] snow water equivalent
+    real(8) :: SWEi      ! [mm] snow water equivalent as ice
+    real(8) :: SWEl     ! [mm] snow water equivalent as liquid
+    real(8) :: PotInf     ! potential infiltration to soil profile (mm)            
   end type snowwater_type
 
 ! Soil hydraulic properties for spafhy
