@@ -74,6 +74,7 @@ integer, parameter, public :: met_ind_init = 1
 public get_params
 public decompose
 public initialize
+public initialize_totc
 public average_met
 public partition_nitr
 public inputs_to_fractions
@@ -121,16 +122,7 @@ contains
     real :: neg_c_input_yr(statesize_yasso)
     real :: matrix(statesize_yasso, statesize_yasso)
     real :: totc
-    real :: decomp_h
-    real :: cue
-    real :: cupt_awen
-    real :: nc_awen
-    real :: growth_c
-    real :: resp
-    integer :: cue_iter
-    real :: nc_som
 
-    integer, parameter :: max_cue_iter = 10
     
     ! Carbon
     ! 
@@ -147,20 +139,101 @@ contains
 
     ! Nitrogen
     !
+    call eval_steadystate_nitr(&
+         cstate, &
+         -sum(neg_c_input_yr), & ! respiration equal to C input in equilibrium
+         flux_nitr_day * days_yr, & 
+         matrix, &
+         nstate)
+    
+  end subroutine initialize
+
+  subroutine eval_steadystate_nitr(cstate, resp_yr, nitr_input_yr, matrix, nstate)
+    ! evaluate the steady state N pool based on the steady state C pools.
+    real, intent(in) :: cstate(statesize_yasso)
+    real, intent(in) :: resp_yr ! respiration in steady state == negative input
+    real, intent(in) :: nitr_input_yr ! nitrogen input
+    real, intent(in) :: matrix(statesize_yasso, statesize_yasso) ! the matrix used in steady state computation
+    real, intent(out) :: nstate ! steady state N
+
+    integer, parameter :: max_cue_iter = 10
+
+    real :: decomp_h
+    real :: cue
+    real :: cupt_awen
+    real :: nc_awen
+    real :: growth_c
+    integer :: cue_iter
+    real :: nc_som
+    
     decomp_h = matrix(5,5) * cstate(5)
     cue = 0.43 ! initially
-    resp = -sum(neg_c_input_yr) ! respiration equal to C input in equilibrium
+    
     do cue_iter = 1, max_cue_iter
-       cupt_awen = (resp - decomp_h) / (1.0 - cue)
+       cupt_awen = (resp_yr - decomp_h) / (1.0 - cue)
        growth_c = cue * cupt_awen
        ! Solve nc_awen from the state equation (below) such that nstate becomes stationary:
-       nc_awen = (1.0 / cupt_awen) * (nc_mb * cue * cupt_awen - nc_h_max*decomp_h + flux_nitr_day*days_yr)
+       nc_awen = (1.0 / cupt_awen) * (nc_mb * cue * cupt_awen - nc_h_max*decomp_h + nitr_input_yr)
        nstate = sum(cstate(1:4)) * nc_awen + nc_h_max * cstate(5)
        nc_som = nstate / sum(cstate)
        cue = max(min(0.43 * (nc_som / nc_mb) ** 0.6, 1.0), cue_min)
     end do
     
-  end subroutine initialize
+  end subroutine eval_steadystate_nitr
+  
+  subroutine initialize_totc(param, totc, cn_input, fract_root_input, fract_legacy_soc, &
+       tempr_c, precip_day, tempr_ampl, cstate, nstate)
+    ! Another, simpler initialization method which enforces the total C and N stocks
+    ! strictly and requires setting the fraction of "legacy" carbon explicitly. Given a
+    ! total C, the C pools are set as a weighted combination of an equilibrated
+    ! partitioning and a "legacy" partitioning where all C is assigned to the H pool. The
+    ! weighting is given by the fract_legacy_soc parameter. The N pool is set analoguously
+    ! with the equilibrium N depending on the given C:N ratio of input.
+    real, intent(in) :: param(:) ! parameter vector
+    real, intent(in) :: totc ! total C pool
+    real, intent(in) :: cn_input ! C:N ratio of the steady-state input 
+    real, intent(in) :: fract_root_input ! fraction of input C with the fineroot composition
+    real, intent(in) :: fract_legacy_soc
+    real, intent(in) :: tempr_c
+    real, intent(in) :: tempr_ampl
+    real, intent(in) :: precip_day ! mm
+    real, intent(out) :: cstate(statesize_yasso)
+    real, intent(out) :: nstate ! nitrogen
+
+    real, parameter :: legacy_state(statesize_yasso) = (/0.0, 0.0, 0.0, 0.0, 1.0/)
+    real :: matrix(statesize_yasso, statesize_yasso)
+    real :: unit_input(statesize_yasso)
+    real :: tmpstate(statesize_yasso)
+    real :: eqstate(statesize_yasso)
+    real :: eqfac
+    real :: eqnitr
+    
+    call evaluate_matrix_mean_tempr(param, tempr_c, precip_day * days_yr,tempr_ampl, matrix)
+    if (fract_root_input < 0.0 .or. fract_root_input > 1) then
+       print *, 'Bad fract_root_input:', fract_root_input
+       error stop
+    end if
+    if (fract_legacy_soc < 0.0 .or. fract_legacy_soc > 1) then
+       print *, 'Bad fract_legacy_soc:', fract_legacy_soc
+       error stop
+    end if
+    
+    unit_input = fract_root_input * awenh_fineroot + (1.0 - fract_root_input) * awenh_leaf
+    call solve(matrix, -unit_input, tmpstate)
+    eqfac = totc / sum(tmpstate)
+    eqstate = eqfac * tmpstate
+    call eval_steadystate_nitr(eqstate, eqfac, eqfac / cn_input, matrix, eqnitr)
+    
+    cstate = fract_legacy_soc * legacy_state * totc + (1.0 - fract_legacy_soc) * eqstate
+    nstate = fract_legacy_soc * totc * nc_h_max + (1.0 - fract_legacy_soc) * eqnitr
+
+    print *, 'TOTC INITIALIZATION'
+    print *, 'CSTATE:', cstate
+    print *, 'C:N ratio:', sum(cstate)/nstate
+    print *, 'Equlibrium C input:', eqfac
+    print *, 'legacy fraction:', fract_legacy_soc
+    print *, 'equilibrium state:', eqstate
+  end subroutine initialize_totc
 
   subroutine inputs_to_fractions(leaf, root, soluble, compost, fract)
     ! Split C in various types of inputs into the (here hard-coded) YASSO fractions
@@ -179,12 +252,10 @@ contains
     
   end subroutine inputs_to_fractions
   
-  subroutine decompose(param, timestep_days, c_input_awenh_day, nitr_input_day, tempr_c, &
+  subroutine decompose(param, timestep_days, tempr_c, &
        precip_day, cstate, nstate, ctend, ntend)
     real, intent(in) :: param(:) ! parameter vector
     real, intent(in) :: timestep_days
-    real, intent(in) :: c_input_awenh_day(statesize_yasso)
-    real, intent(in) :: nitr_input_day  ! organic nitrogen input per day
     real, intent(in) :: tempr_c ! air temperature
     real, intent(in) :: precip_day ! precipitation mm / day
     real, intent(in) :: cstate(:) ! AWENH
@@ -193,7 +264,6 @@ contains
     real, intent(out) :: ntend ! nitrogen, single pool    
     
     real :: matrix(statesize_yasso, statesize_yasso)
-    real :: c_input_yr(statesize_yasso)
     real :: totc ! total C, step beginning
     real :: decomp_h ! C mineralization from the H pool
     real :: cue ! carbon use (growth) efficiency
@@ -207,7 +277,6 @@ contains
     real :: nc_h ! N:C of the H pool
     real :: resp ! heterotrophic respiration
     
-    c_input_yr = c_input_awenh_day * days_yr
     totc = sum(cstate)
 
     ! Carbon
@@ -217,14 +286,14 @@ contains
     ! exponential in yearly or longer steps, but here with a daily timestep this is not
     ! needed and explicit 1st order time stepping is used instead.
     timestep_yr = timestep_days / days_yr
-    ctend = c_input_yr*timestep_yr + matmul(matrix, cstate) * timestep_yr   
-    resp = sum(c_input_yr*timestep_yr - ctend)
+    ctend = matmul(matrix, cstate) * timestep_yr   ! (matmul(matrix, cstate) + c_input_yr) * timestep_yr
+    resp = sum(-ctend)
     
     ! Nitrogen
     !
     if (totc < 1e-6) then
        ! No SOM, no need for N dynamics
-       ntend = nitr_input_day
+       ntend = 0.0
     else
        decomp_h = matrix(5,5) * cstate(5) * timestep_yr
        if (cstate(5) * nc_h_max > nstate) then
@@ -243,7 +312,7 @@ contains
        growth_c = cue * cupt_awen
        ! The immobilization / mineralization is equal to the difference of nitrogen needed for
        ! microbial growth and the nitrogen released from the decomposed organic matter.
-       ntend = nc_mb * growth_c - nc_awen * cupt_awen - nc_h * decomp_h + nitr_input_day
+       ntend = nc_mb * growth_c - nc_awen * cupt_awen - nc_h * decomp_h
     end if
     
   end subroutine decompose
