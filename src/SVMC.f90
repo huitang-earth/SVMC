@@ -263,6 +263,7 @@ program SVMC
           ! in mm/s H20
           ! Transpiration derived from P-hydro
 
+          ! LAI to be considered here!
           tr_phydro = 1.6*gs*(vpd/pres)*h2o_molmass/density_h2o(temp-273.15, pres)     
           rn= rg * 0.7
           !rn = max(2.57*lai/(2.57*lai+0.57)-0.2, 0.55)*rg  ! Launiainen et al. 2016 GCB, fit to Fig 2a

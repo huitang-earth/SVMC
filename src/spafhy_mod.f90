@@ -40,7 +40,7 @@ contains
     type(snowwater_type), intent(inout)    :: snowwater_state
         
     soilwater_state%PondSto = maxpond
-    soilwater_state%WatSto  = 0.0
+    soilwater_state%WatSto  = 0.0                  ! set to half or 90% saturation, impose minimum soil water potential
     soilwater_state%MaxWatSto = soil_depth*max_poros
     soilwater_state%WatStoTop  = 0.0
     soilwater_state%MaxStoTop = org_depth * org_fc
