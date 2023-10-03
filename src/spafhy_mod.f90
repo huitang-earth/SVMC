@@ -48,14 +48,14 @@ contains
     soilwater_state%WatStoTop = 0.9 * soilwater_state%MaxStoTop
     soilwater_state%PondSto = 0.0 ! no ponding
 
-    call set_soilwaterState(soilwater_state)
+    call set_soilwaterState(soilwater_state, spafhy_para)
 
     ! canopywater
     canopywater_state%CanopyStorage=0.0
 
-    snowwater_state%swe=0.0
-    snowwater_state%SWEi=0.0
-    snowwater_state%SWEl=0.0
+    canopywater_state%swe=0.0
+    canopywater_state%SWEi=0.0
+    canopywater_state%SWEl=0.0
 
   END SUBROUTINE initialization_spafhy
   
@@ -123,7 +123,7 @@ contains
     ! drainage: if retflow from groundwater storage, set drain to zero.
 
     if (retflow .gt. 0.0) then 
-     soilwater_state%Drain = 0.0
+     soilwater_flux%Drain = 0.0
     else
       soilwater_flux%Drain = min(soilwater_state%Kh * (time_step * 3600.0), & ! conductivity
                                max(0.0, (soilwater_state%Wliq - spafhy_para%fc))* spafhy_para%soil_depth) ! available water
@@ -131,12 +131,12 @@ contains
     
     ! inflow to root zone: restricted by potential inflow or available pore space
     Qin = (retflow + rr1)         ! m, pot. inflow
-    soilwater_flux%Inflow = min(Qin, soilwater_state%MaxWatSto - soilwater_state%WatSto + soilwater_state%Drain)    
+    soilwater_flux%Inflow = min(Qin, soilwater_state%MaxWatSto - soilwater_state%WatSto + soilwater_flux%Drain)    
     dSto = (soilwater_flux%Inflow - soilwater_flux%Drain)
     soilwater_state%WatSto = min(soilwater_state%MaxWatSto, max(soilwater_state%WatSto + dSto, eps))
                 
     ! if inflow excess after filling rootzone, update first top layer storage
-    exfil = Qin - soilwater_state%Inflow
+    exfil = Qin - soilwater_flux%Inflow
     to_top_layer = min(exfil, soilwater_state%MaxStoTop - soilwater_state%WatStoTop - eps)
     ! self.WatStoTop = self.WatStoTop + to_top_layer
     soilwater_state%WatStoTop = soilwater_state%WatStoTop + to_top_layer
@@ -146,10 +146,10 @@ contains
     soilwater_state%PondSto = soilwater_state%PondSto + to_pond
  
     ! ... and route remaining to surface runoff
-    soilwater_state%Roff = exfil - to_top_layer - to_pond
+    soilwater_flux%Roff = exfil - to_top_layer - to_pond
 
     ! update soil water state variables
-    call set_soilwaterState(soilwater_state)
+    call set_soilwaterState(soilwater_state, spafhy_para)
 
     ! mass balance error [m]
     soilwater_state%mbe = (soilwater_state%WatSto - WatSto0)  &
@@ -247,9 +247,9 @@ contains
     real(8)      , intent(in)    :: VPD    ! vapor pressure deficit (Pa)
     real(8)      , intent(in)    :: Ras     ! ground aerodynamic resistance (s m-1)
     real(8)      , intent(in)    :: P      ! pressure [Pa], scalar or matrix
-    type(canopywater_flux_type), intent(in)   :: canopywater_flux
+    type(canopywater_flux_type), intent(inout)   :: canopywater_flux
     type(soilwater_state_type), intent(in)          :: soilwater_state  ! soilwater state (for ground evaporation)
-    type(canopywater_state_type), intent(inout)   :: canopywater_state
+    type(canopywater_state_type), intent(in)   :: canopywater_state
     type(spafhy_para_type), intent(in)    :: spafhy_para
 
     ! ! Local variables 
@@ -550,7 +550,7 @@ contains
   ! Updates soil water state variables
   !-------------------------------------------
     ! !ARGUMENTS
-    type(soilwater_type), intent(inout) :: soilwater_state                         ! 
+    type(soilwater_state_type), intent(inout) :: soilwater_state                         ! 
     type(spafhy_para_type), intent(in)  :: spafhy_para
   ! !LOCAL VARIABLES:  
     real(8)   :: eps=1e-16

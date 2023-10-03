@@ -130,7 +130,7 @@ program SVMC
   ! psi_soil=0
   call readctrl_namelist
   call readvegpara_namelist
-  call readsoilhydro_namelist(spfhy_para)
+  call readsoilhydro_namelist(spafhy_para)
 
   !call set_soilwaterState(soilwater_state, canopywater_state)
   call initialization_spafhy(canopywater_state, soilwater_state, spafhy_para)
@@ -299,11 +299,11 @@ program SVMC
                                   canopywater_state, canopywater_flux, soilwater_state, spafhy_para)
 
           ! ET [mm]
-          canopywater_state%ET =  tr_phydro * (time_step*3600.0) +  canopywater_state%GroundEvap + &
-                                      canopywater_state%CanopyEvap
+          canopywater_flux%ET =  tr_phydro * (time_step*3600.0) +  canopywater_flux%GroundEvap + &
+                                      canopywater_flux%CanopyEvap
           
           LatentHeat = 1.0e3 * (3147.5 - 2.37 * (temp))
-          LE = canopywater_state%ET / (time_step * 3600.0) * LatentHeat ! Wm-2
+          LE = canopywater_flux%ET / (time_step * 3600.0) * LatentHeat ! Wm-2
 
           ! Solve soil water balance
 
@@ -327,10 +327,10 @@ program SVMC
         write(99,'(*(G0.6,:,","))') & 
         prec, temp - 273.15, soilwater_state%Wliq, soilwater_state%Wliq_top, &
         soilwater_state%Psi, soilwater_state%mbe, tr_spafhy, &
-        canopywater_state%GroundEvap*1.0e-3, soilwater_state%Inflow, soilwater_state%Drain, soilwater_state%Roff, &
-        soilwater_state%PondSto, snowwater_state%swe, snowwater_state%SWEl, snowwater_state%SWEi, &
-        canopywater_state%CanopyEvap*1e-3, &
-        canopywater_state%MBE, canopywater_state%CanopyStorage, canopywater_state%Trfall, LE
+        canopywater_flux%GroundEvap*1.0e-3, soilwater_flux%Inflow, soilwater_flux%Drain, soilwater_flux%Roff, &
+        soilwater_state%PondSto, canopywater_state%swe, canopywater_state%SWEl, canopywater_state%SWEi, &
+        canopywater_flux%CanopyEvap*1e-3, &
+        canopywater_state%MBE, canopywater_state%CanopyStorage, canopywater_flux%Trfall, LE
 
         if ( mod(tot_hour,time_step_output) .eq. 0.0 ) then
             
@@ -352,7 +352,7 @@ program SVMC
           soilmoist1_matrix(1,1,1)=soilwater_state%Wliq
           !psi_soil_matrix(1,1,1)=psi_soil_spafhy
           psi_soil_matrix(1,1,1)=soilwater_state%Psi ! MPa
-          evap_matrix(1,1,1)=canopywater_state%ET
+          evap_matrix(1,1,1)=canopywater_flux%ET
           print *, "step_nc_hr=", step_nc_hr
 
           call netCDF_writeOUTPUT(output_filename_hr, "GPP", gpp_matrix, tot_hour/24.0, step_nc_hr)

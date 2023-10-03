@@ -30,7 +30,7 @@ implicit none
     real(8) :: SWEi      ! [mm] snow water equivalent as ice
     real(8) :: SWEl     ! [mm] snow water equivalent as liquid
     real(8) :: MBE = 0.0       ! mass balance error (mm)      
-  end type canopywater_state_stype
+  end type canopywater_state_type
 
   type, public :: canopywater_flux_type
     real(8) :: Trfall = 0.0    ! throughfall to snow / soil surface (mm, during timestep)

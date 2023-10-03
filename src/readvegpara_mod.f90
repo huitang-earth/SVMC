@@ -73,9 +73,8 @@ contains
       b, &
       alpha, &
       gamma, &
-      opt_hypothesis, &
+      opt_hypothesis
 
-     
     old=.false.
     num_pft=1
     pft_type="grass"
