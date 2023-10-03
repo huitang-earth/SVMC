@@ -79,7 +79,7 @@ contains
     canopywater_flux%Transpi=0.0
     canopywater_flux%PotInf=0.0
 
-  END SUBROUTINE initialization_spafhy
+  END SUBROUTINE initialization_spafhy_flux
   
   SUBROUTINE soil_water(soilwater_state, soilwater_flux, rr, tr, evap, retflow, spafhy_para)
   ! ---------------------------------------------------------------
