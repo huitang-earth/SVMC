@@ -274,10 +274,14 @@ program SVMC
           ! Solve plant canopy and soil water budget
           
           ! Transpiration derived from P-hydro
-          ! HUI - check units of gs and conversion to tr_phydro. We want it to be [mm s-1 = kg H2O m-2 s-1] 
-          ! [tr_phydro] = [1] * [??] * [Pa Pa-1] * [kg mol-1] / [kg m-3] 
-          tr_phydro = 1.6*gs*(vpd/pres)*h2o_molmass/density_h2o(temp-273.15, pres)
-          
+          ! HUI - check units of gs and conversion to tr_phydro. We want it to be ≈ kg H2O m-2 s-1] 
+          ! [tr_phydro] [mm s-1] = [1] * [mol/m2/s] * [Pa Pa-1] * [g mol-1] / [kg m-3]  
+          ! Density of water is used here to more accurately convert the unit to mm -s
+          if (ISNAN(gs)) then
+            tr_phydro = 0.0
+          else
+             tr_phydro = 1.6*gs*(vpd/pres)*h2o_molmass/density_h2o(temp-273.15, pres) * lai
+          end if
           ! net radiation of the whole canopy-soil system [W m-2]
           ! Samuli will revise later!
           rn= rg * 0.7
