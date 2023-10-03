@@ -349,6 +349,7 @@ contains
     Sh = (1.79 + 3.0*U**0.5)                      ! Sherwood numbner (-)
     gi = Sh*canopywater_state%CanopyStorage * Ce / 7.68 + eps                ! m s-1
 
+    erate=0.0
     if ((Prec == 0) .and. (T <= Tmin)) then
       ! sublimation
       erate =  (time_step * 3600) / Ls * penman_monteith(AE, D, T, gi, Ga, P) ! mm in timestep
