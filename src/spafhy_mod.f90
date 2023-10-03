@@ -58,6 +58,28 @@ contains
     canopywater_state%SWEl=0.0
 
   END SUBROUTINE initialization_spafhy
+
+  SUBROUTINE initialization_spafhy_flux(canopywater_flux, soilwater_flux)
+    type(soilwater_flux_type), intent(inout)    :: soilwater_flux
+    type(canopywater_flux_type), intent(inout)  :: canopywater_flux
+        
+    ! soilwater flux
+    soilwater_flux%Inflow = 0.0
+    soilwater_flux%Roff   = 0.0
+    soilwater_flux%Drain  = 0.0
+    soilwater_flux%Interc = 0.0
+
+    ! canopywater flux
+    canopywater_flux%Trfall=0.0
+    canopywater_flux%Interc=0.0
+    canopywater_flux%CanopyEvap=0.0
+    canopywater_flux%Unload=0.0
+    canopywater_flux%GroundEvap=0.0
+    canopywater_flux%ET=0.0
+    canopywater_flux%Transpi=0.0
+    canopywater_flux%PotInf=0.0
+
+  END SUBROUTINE initialization_spafhy
   
   SUBROUTINE soil_water(soilwater_state, soilwater_flux, rr, tr, evap, retflow, spafhy_para)
   ! ---------------------------------------------------------------

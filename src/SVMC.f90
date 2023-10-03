@@ -198,12 +198,10 @@ program SVMC
           ! Only update LAI daily
 
           if (mod(tot_hour,24.0) .eq. 0) then
-            call netCDF_readlai(input_laifile, lai_matrix, step_lai)
-            call netCDF_readsoilmoist('../data/FieldObs_Qvidja.2021.soilmoist.nc', soilmoist_matrix, step_lai)
             
             if (obs_lai) then
               call netCDF_readlai(input_laifile, lai_matrix, step_lai)
-            lai=lai_matrix(1,1,1)
+              lai=lai_matrix(1,1,1)
               step_lai=step_lai+1
               ! calculate fapar:
               fapar= 1-exp(-k*lai)
@@ -211,7 +209,7 @@ program SVMC
 
             if (obs_soilmoist) then
               call netCDF_readsoilmoist('../data/FieldObs_Qvidja.2021.soilmoist.nc', soilmoist_matrix, step_soilmoist)
-            soilmoist=soilmoist_matrix(1,1,1)             
+              soilmoist=soilmoist_matrix(1,1,1)               
               call soil_water_retention_curve(soilmoist, psi_soil)
               step_soilmoist=step_soilmoist+1
             else
@@ -245,9 +243,6 @@ program SVMC
           ! run phydro to estimate photosynthetic rate (a) and stomatal conductance (gs)
           ! At what time scale the optimization should work need to be tested!!!!
           
-          !psi_soil = -1.0
-          psi_soil = soilwater_state%Psi !root zone, MPa
-          !psi_soil = min(-eps, max(psi_soil, -2.0))  ! ensures psi_soil <0 and >-2.0 MPa
           rdark=0.0
 
           print *, "temp =", temp-273.15                  ! unit should be C
@@ -294,6 +289,8 @@ program SVMC
           
           ! call SpaFHy code to compute new canopywater_state and snowwater_state
           ! returns water fluxes integrated over time_step in units [mm = kg H2O m-2]
+          call initialization_spafhy_flux(canopywater_flux, soilwater_flux)
+          
           call canopy_water_flux(rn, temp-273.15, prec, vpd, wind, pres, fapar, lai, &
                                   canopywater_state, canopywater_flux, soilwater_state, spafhy_para)
 
