@@ -34,10 +34,10 @@ program SVMC
   ! Loop variables
   !***********************************
   integer         :: i, m
-  integer         :: step_nc_hr, step_nc_day, step_clim, step_lai
+  integer         :: step_nc_hr, step_nc_day, step_clim, step_lai, step_soilmoist
   real(kind=dp)   :: tot_hour, tot_hour_end, juldate, start_date, end_date
   real(8), dimension(1)     :: start_clim_time, end_clim_time
-  real(8)            :: start_clim_juldate,start_lai_juldate    
+  real(8)            :: start_clim_juldate,start_lai_juldate,start_soilmoist_juldate   
   real(8), dimension(1)    :: start_lai_time, end_lai_time 
   integer         :: ntim_clim, ntim_lai, ntim_out_hr, ntim_out_day
  
@@ -164,10 +164,12 @@ program SVMC
   ! To simplify the time management, specify the julian start date of the inputdata by hand.
   start_clim_juldate=juldate(20201231,233000)
   start_lai_juldate =juldate(20210101,000000)
+  start_soilmoist_juldate =juldate(20210101,000000)
   
   ! step the starting time steps for reading input files
   step_clim = floor((start_date-start_clim_juldate)*24)+1
   step_lai  = floor(start_date-start_lai_juldate)+1
+  step_soilmoist = floor(start_date-start_soilmoist_juldate)+1
 
   print *, num_sites, lat_sites, lon_sites, tot_hour, num_pft
 
@@ -199,28 +201,25 @@ program SVMC
             call netCDF_readlai(input_laifile, lai_matrix, step_lai)
             call netCDF_readsoilmoist('../data/FieldObs_Qvidja.2021.soilmoist.nc', soilmoist_matrix, step_lai)
             
+            if (obs_lai) then
+              call netCDF_readlai(input_laifile, lai_matrix, step_lai)
             lai=lai_matrix(1,1,1)
+              step_lai=step_lai+1
+              ! calculate fapar:
+              fapar= 1-exp(-k*lai)
+            end if
+
+            if (obs_soilmoist) then
+              call netCDF_readsoilmoist('../data/FieldObs_Qvidja.2021.soilmoist.nc', soilmoist_matrix, step_soilmoist)
             soilmoist=soilmoist_matrix(1,1,1)             
-            
-            !call soil_water_retention_curve(soilmoist, psi_soil)
-            ! add soil rentention curve here to test soil water potential calculation
-            !n1=1.07       !Launiainen et al. 2022: C1-5: 1.12, 1.14, 1.07, 1.27, 1.18  
-            !m1=1.0/n1  
-            !watres=0.0   !Launiainen et al. 2022: C1-5: 0.0
-            !alpha_van=2.02   !Launiainen et al. 2022: C1-5: 4.45, 5.92, 2.02, 4.49, 3.35
-            !watsat=0.46  !Launiainen et al. 2022: C1-5: 0.75, 0.68, 0.46, 0.47, 0.54  
+              call soil_water_retention_curve(soilmoist, psi_soil)
+              step_soilmoist=step_soilmoist+1
+            else
+              !psi_soil = -1.0
+              psi_soil = soilwater_state%Psi !root zone, MPa
+              !psi_soil = min(-eps, max(psi_soil, -2.0))  ! ensures psi_soil <0 and >-2.0 MPa
+            end if
 
-            !vol_liq=soilmoist
-            !vol_ice = 0.0   
-            !eff_porosity = max(0.01, watsat-vol_ice)
-    
-            !satfrac  = (vol_liq-watres)/(eff_porosity-watres)
-            !print *, "satfrac=", satfrac 
-            !psi_soil = -(1.0/alpha_van)*(satfrac**(1.0/(m1-1.0)) - 1.0 )**m1  ! psi_soil in kPa
-
-            ! calculate fapar:
-            step_lai=step_lai+1
-            fapar= 1-exp(-k*lai)
           end if
 
           ! Determine whether to read new climate variables
