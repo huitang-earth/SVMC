@@ -105,9 +105,11 @@ program SVMC
   !real(8) :: n1, m1, alpha_van           ! (-), pore-size-distribution parameter for Van Genuchten 1.07
   !real(8) :: eff_porosity! v/v, volume of ice
 
-  type(soilwater_type)          :: soilwater_state  
-  type(canopywater_type)        :: canopywater_state
-  type(snowwater_type)        :: snowwater_state
+  type(soilwater_state_type)          :: soilwater_state
+  type(soilwater_flux_type)           :: soilwater_flux  
+  type(canopywater_state_type)        :: canopywater_state
+  type(canopywater_flux_type)         :: canopywater_flux
+  type(spafhy_para_type)              :: spafhy_para
 
   !character(len=200)  ::
   !real,dimension(:,:), allocatable
@@ -128,10 +130,10 @@ program SVMC
   ! psi_soil=0
   call readctrl_namelist
   call readvegpara_namelist
-  call readsoilhydro_namelist
+  call readsoilhydro_namelist(spfhy_para)
 
   !call set_soilwaterState(soilwater_state, canopywater_state)
-  call initialization_spafhy(canopywater_state, snowwater_state, soilwater_state)
+  call initialization_spafhy(canopywater_state, soilwater_state, spafhy_para)
 
 
   !***********************************
@@ -294,7 +296,7 @@ program SVMC
           ! call SpaFHy code to compute new canopywater_state and snowwater_state
           ! returns water fluxes integrated over time_step in units [mm = kg H2O m-2]
           call canopy_water_flux(rn, temp-273.15, prec, vpd, wind, pres, fapar, lai, &
-                                  canopywater_state, snowwater_state, soilwater_state)
+                                  canopywater_state, canopywater_flux, soilwater_state, spafhy_para)
 
           ! ET [mm]
           canopywater_state%ET =  tr_phydro * (time_step*3600.0) +  canopywater_state%GroundEvap + &
@@ -308,9 +310,9 @@ program SVMC
           tr_spafhy=tr_phydro*(time_step*3600.0*1.0e-3)   ! This variable has to be used to be modified in soil_water
           retflow=0.0
           ! water fluxes must be in units [m]. Updates soilwater_state, including soilwater_state%Psi.
-          call soil_water(soilwater_state, snowwater_state%PotInf*1.0e-3, &
+          call soil_water(soilwater_state, soilwater_flux, canopywater_flux%PotInf*1.0e-3, &
                           tr_spafhy,  &
-                          canopywater_state%GroundEvap*1.0e-3, retflow)  
+                          canopywater_flux%GroundEvap*1.0e-3, retflow, spafhy_para)  
 
           !call soil_water_retention_curve(soilwater_state%Wliq, psi_soil_spafhy) 
 

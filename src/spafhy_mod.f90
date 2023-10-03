@@ -36,13 +36,13 @@ MODULE spafhy_mod
 
 contains
 
-  SUBROUTINE initialization_spafhy(canopywater_state, snowwater_state, soilwater_state)
-    type(soilwater_type), intent(inout)    :: soilwater_state
-    type(canopywater_type), intent(inout)  :: canopywater_state
-    type(snowwater_type), intent(inout)    :: snowwater_state
+  SUBROUTINE initialization_spafhy(canopywater_state, soilwater_state, spafhy_para)
+    type(soilwater_state_type), intent(inout)    :: soilwater_state
+    type(canopywater_state_type), intent(inout)  :: canopywater_state
+    type(spafhy_para_type), intent(in)    :: spafhy_para
         
-    soilwater_state%MaxWatSto = soil_depth * max_poros
-    soilwater_state%MaxStoTop = org_depth * org_fc
+    soilwater_state%MaxWatSto = spafhy_para%soil_depth * spafhy_para%max_poros
+    soilwater_state%MaxStoTop = spafhy_para%org_depth * spafhy_para%org_fc
     ! initial state
     soilwater_state%WatSto  = 0.9 * soilwater_state%MaxWatSto
     soilwater_state%WatStoTop = 0.9 * soilwater_state%MaxStoTop
@@ -59,7 +59,7 @@ contains
 
   END SUBROUTINE initialization_spafhy
   
-  SUBROUTINE soil_water(soilwater_state, rr, tr, evap, retflow)
+  SUBROUTINE soil_water(soilwater_state, soilwater_flux, rr, tr, evap, retflow, spafhy_para)
   ! ---------------------------------------------------------------
   !      Computes 2-layer bucket model water balance for one timestep dt
   !      Top layer is interception storage and contributes only to evap.
@@ -76,7 +76,9 @@ contains
   ! ----------------------------------------------------------------
 
   ! !ARGUMENTS:
-    type(soilwater_type), intent(inout)    :: soilwater_state    
+    type(soilwater_state_type), intent(inout)    :: soilwater_state    
+    type(soilwater_flux_type), intent(inout)    :: soilwater_flux    
+    type(spafhy_para_type), intent(in)    :: spafhy_para
     real(8)      , intent(in)    :: rr      ! potential infiltration [m]
     real(8)      , intent(inout) :: tr      ! transpiration from root zone [m]
     real(8)      , intent(in)    :: evap    ! evaporation from top layer [m]
@@ -102,16 +104,16 @@ contains
         
     ! top layer:
     ! interception
-    soilwater_state%Interc = max(0.0, (soilwater_state%MaxStoTop - soilwater_state%WatStoTop)) &
+    soilwater_flux%Interc = max(0.0, (soilwater_state%MaxStoTop - soilwater_state%WatStoTop)) &
                     * (1.0 - exp(-(rr1 / soilwater_state%MaxStoTop)))
 
-    soilwater_state%WatStoTop = max(0.0, soilwater_state%WatStoTop + soilwater_state%interc)  
+    soilwater_state%WatStoTop = max(0.0, soilwater_state%WatStoTop + soilwater_flux%Interc)  
     ! evaporation 
     evap1 = min(evap, soilwater_state%WatStoTop)
     soilwater_state%WatStoTop = soilwater_state%WatStoTop - evap1
       
     ! infiltration to rootzone
-    rr1 = rr1 - soilwater_state%Interc
+    rr1 = rr1 - soilwater_flux%Interc
                 
     ! root one
     ! transpiration
@@ -123,14 +125,14 @@ contains
     if (retflow .gt. 0.0) then 
      soilwater_state%Drain = 0.0
     else
-      soilwater_state%Drain = min(soilwater_state%Kh * (time_step * 3600.0), & ! conductivity
-                               max(0.0, (soilwater_state%Wliq - fc))*soil_depth) ! available water
+      soilwater_flux%Drain = min(soilwater_state%Kh * (time_step * 3600.0), & ! conductivity
+                               max(0.0, (soilwater_state%Wliq - spafhy_para%fc))* spafhy_para%soil_depth) ! available water
     end if 
     
     ! inflow to root zone: restricted by potential inflow or available pore space
     Qin = (retflow + rr1)         ! m, pot. inflow
-    soilwater_state%Inflow = min(Qin, soilwater_state%MaxWatSto - soilwater_state%WatSto + soilwater_state%Drain)    
-    dSto = (soilwater_state%Inflow - soilwater_state%Drain)
+    soilwater_flux%Inflow = min(Qin, soilwater_state%MaxWatSto - soilwater_state%WatSto + soilwater_state%Drain)    
+    dSto = (soilwater_flux%Inflow - soilwater_flux%Drain)
     soilwater_state%WatSto = min(soilwater_state%MaxWatSto, max(soilwater_state%WatSto + dSto, eps))
                 
     ! if inflow excess after filling rootzone, update first top layer storage
@@ -140,7 +142,7 @@ contains
     soilwater_state%WatStoTop = soilwater_state%WatStoTop + to_top_layer
         
     ! ... and then pond storage ...
-    to_pond = min(exfil - to_top_layer, maxpond - soilwater_state%PondSto - eps)
+    to_pond = min(exfil - to_top_layer, spafhy_para%maxpond - soilwater_state%PondSto - eps)
     soilwater_state%PondSto = soilwater_state%PondSto + to_pond
  
     ! ... and route remaining to surface runoff
@@ -153,12 +155,14 @@ contains
     soilwater_state%mbe = (soilwater_state%WatSto - WatSto0)  &
                      + (soilwater_state%WatStoTop - WatStoTop0) &
                      + (soilwater_state%PondSto - PondSto0) &
-                     - (rr + retflow - tr - evap1 - soilwater_state%Drain - soilwater_state%Roff)
+                     - (rr + retflow - tr - evap1 - soilwater_flux%Drain - soilwater_flux%Roff)
   
   END SUBROUTINE soil_water
 
   SUBROUTINE soil_water_retention_curve(vol_liq, smp)
   ! converts vol. water content to soil water potential (in MPa)
+  ! To do: 
+  !      - fc, wp and kh need to be derived in this soubroutine
 
     implicit none
     real(8), intent(in) :: vol_liq        ! v/v, volumetric of liq in soil bucket
@@ -171,7 +175,7 @@ contains
 
     real(8) :: vol_ice     ! v/v, volumetric ice in soil bucket 
     real(8) :: satfrac     ! parameter for Van Genuchten
-    real(8) :: n1, m1, alpha_van           ! (-), pore-size-distribution parameter for Van Genuchten 1.07
+    real(8) :: n1, m1, alpha_van, watsat,watres         ! (-), pore-size-distribution parameter for Van Genuchten 1.07
     real(8) :: eff_porosity! v/v, volume of ice
     
   !--- Van Genuchten scheme based on FatesHydro (parameters from Launiainen et al. Forests, 2022)
@@ -180,6 +184,7 @@ contains
     m1=1.0/n1  
     alpha_van=2.02   !Launiainen et al. 2022: C1-5: 4.45, 5.92, 2.02, 4.49, 3.35
     watsat=0.46  !Launiainen et al. 2022: C1-5: 0.75, 0.68, 0.46, 0.47, 0.54  
+    watres=0.0
   
     vol_ice = 0.0  
     eff_porosity = max(0.01, watsat - vol_ice)
@@ -191,7 +196,8 @@ contains
   END SUBROUTINE soil_water_retention_curve
 
 
-  SUBROUTINE canopy_water_flux(Rn, Ta, Prec, VPD, U, P, fapar, LAI, canopywater_state, snowwater_state, soilwater_state)
+  SUBROUTINE canopy_water_flux(Rn, Ta, Prec, VPD, U, P, fapar, LAI,            & 
+                             canopywater_state, canopywater_flux, soilwater_state, spafhy_para)
     !
     ! Computes plant canopy interception, throughfall, ground evaporation, snowpack dynamics
     ! NOTE: Re-think canopy snow interception when snow depth > canopy height 
@@ -207,30 +213,31 @@ contains
     real(8)      , intent(in)    :: fapar  ! fraction of canopy absorbed PAR [-]
     real(8)      , intent(in)    :: LAI    ! leaf area index
 
-    type(canopywater_type), intent(inout)   :: canopywater_state  ! canopy state
-    type(snowwater_type), intent(inout)     :: snowwater_state    ! snowpack state
-    type(soilwater_type), intent(in)     :: soilwater_state  ! soilwater state (for ground evaporation) 
+    type(canopywater_state_type), intent(inout)   :: canopywater_state  ! canopy state
+    type(canopywater_flux_type), intent(inout)    :: canopywater_flux    ! snowpack state
+    type(soilwater_state_type), intent(in)        :: soilwater_state  ! soilwater state (for ground evaporation) 
+    type(spafhy_para_type), intent(in)    :: spafhy_para
 
     ! ! Local variables 
     real(8)     ::    Ra, Rb, Ras, ustar, Uh, Ug, fPheno, AE
   
     ! Calculate aerodynamic resistances for canopy and soil layers
-    call aerodynamics(LAI, U, Ra, Rb, Ras, ustar, Uh, Ug)
+    call aerodynamics(LAI, U, Ra, Rb, Ras, ustar, Uh, Ug, spafhy_para)
 
     ! Calculate canopy interception, canopy evaporation, snowpack dynamics, ground evaporation
     AE = Rn * fapar
-    call canopy_water_snow(canopywater_state, snowwater_state, Ta, Prec, AE, VPD, Ra, U, LAI, P)
+    call canopy_water_snow(canopywater_state, canopywater_flux, spafhy_para, Ta, Prec, AE, VPD, Ra, U, LAI, P)
 
     ! Calculate soil evaporation rate
     AE = Rn * (1 - fapar)
     print *, "fapar=", fapar
 
-    call ground_evaporation(canopywater_state, snowwater_state, soilwater_state, Ta, AE, VPD, Ras, P)
+    call ground_evaporation(canopywater_state, canopywater_flux, soilwater_state, spafhy_para, Ta, AE, VPD, Ras, P)
 
   END SUBROUTINE canopy_water_flux
 
 
-  SUBROUTINE ground_evaporation(canopywater_state, snowwater_state, soilwater_state, T, AE, VPD, Ras, P)
+  SUBROUTINE ground_evaporation(canopywater_state, canopywater_flux, soilwater_state, spafhy_para, T, AE, VPD, Ras, P)
     !
     ! Calculates evaporation from top soil layer [mm]
 
@@ -240,9 +247,10 @@ contains
     real(8)      , intent(in)    :: VPD    ! vapor pressure deficit (Pa)
     real(8)      , intent(in)    :: Ras     ! ground aerodynamic resistance (s m-1)
     real(8)      , intent(in)    :: P      ! pressure [Pa], scalar or matrix
-    type(snowwater_type), intent(in)   :: snowwater_state
-    type(soilwater_type), intent(in)   :: soilwater_state  ! soilwater state (for ground evaporation)
-    type(canopywater_type), intent(inout)   :: canopywater_state
+    type(canopywater_flux_type), intent(in)   :: canopywater_flux
+    type(soilwater_state_type), intent(in)          :: soilwater_state  ! soilwater state (for ground evaporation)
+    type(canopywater_state_type), intent(inout)   :: canopywater_state
+    type(spafhy_para_type), intent(in)    :: spafhy_para
 
     ! ! Local variables 
     real(8)     ::    Lv, erate, Gas, eps=1E-16
@@ -250,17 +258,17 @@ contains
     Gas = 1 / Ras
     ! gsoil is soil surface conductance when fully wet, defined in readvegpara
 
-    erate = (time_step * 3600) * soilwater_state%beta * penman_monteith(AE, VPD, T, gsoil, Gas, P) / Lv ! mm
+    erate = (time_step * 3600) * soilwater_state%beta * penman_monteith(AE, VPD, T, spafhy_para%gsoil, Gas, P) / Lv ! mm
 
     ! maximum equals available water 
-    canopywater_state%GroundEvap = min(1e3*soilwater_state%WatStoTop, erate)
+    canopywater_flux%GroundEvap = min(1e3*soilwater_state%WatStoTop, erate)
 
-    if (snowwater_state%swe>eps) then
-      canopywater_state%GroundEvap = 0.0  ! no evaporation from floor if snow on ground
+    if (canopywater_state%swe>eps) then
+      canopywater_flux%GroundEvap = 0.0  ! no evaporation from floor if snow on ground
     end if
   END SUBROUTINE ground_evaporation
 
-  SUBROUTINE canopy_water_snow(canopywater_state, snowwater_state, T, Pre, AE, D, Ra, U, LAI, P)
+  SUBROUTINE canopy_water_snow(canopywater_state, canopywater_flux, spafhy_para, T, Pre, AE, D, Ra, U, LAI, P)
     !
     ! Calculates canopy interception, throughfall and snowpack change during timestep dt
     ! Updates canopy and snow storages
@@ -274,12 +282,13 @@ contains
     real(8)      , intent(in)    :: U      ! mean wind speed at ref. height above canopy top [ms-1]
     real(8)      , intent(in)    :: LAI    ! leaf area index [m2 m-2]
     real(8)      , intent(in)    :: P      ! pressure [Pa]
-    type(canopywater_type), intent(inout)   :: canopywater_state
-    type(snowwater_type), intent(inout)   :: snowwater_state
+    type(canopywater_state_type), intent(inout)   :: canopywater_state
+    type(canopywater_flux_type), intent(inout)    :: canopywater_flux
+    type(spafhy_para_type), intent(in)    :: spafhy_para
     
     ! Local variables.
     real(8)  :: fW, fS, Tmin, Tmax, Tmelt, wmax_tot, wmaxsnow_tot
-    real(8)  ::  Ga, Ce, Sh, gi, erate, gs, Sice, Sliq
+    real(8)  :: Ga, Ce, Sh, gi, erate, gs, Sice, Sliq
     real(8)  :: Melt, Freeze, Lv, Ls, SWEo, Wo, Prec
     real(8)  :: eps = 1e-16
 
@@ -299,8 +308,8 @@ contains
     end if
 
     !canopy storage capacities [mm]
-    wmax_tot     = wmax * LAI
-    wmaxsnow_tot = wmaxsnow * LAI
+    wmax_tot     = spafhy_para%wmax * LAI
+    wmaxsnow_tot = spafhy_para%wmaxsnow * LAI
 
     ! latent heat of vaporization (Lv) and sublimation (Ls) J kg-1
     Lv = 1.0e3 * (3147.5 - 2.37 * (T + 273.15))
@@ -330,70 +339,70 @@ contains
 
     !----- Initial conditions for calculating mass balance error
     Wo = canopywater_state%CanopyStorage     ! canopy storage, mm
-    SWEo = snowwater_state%swe    ! Snow water equivalent mm
+    SWEo = canopywater_state%swe    ! Snow water equivalent mm
 
     !----- Canopy water storage change
     ! snow unloading from canopy, ensures also that seasonal LAI development does not mess up computations
     ! HT: (1) unloading first at each timestep? (2) why no snow unload? do we need it here?
     ! SL: below describes snow unloading. If T > Tmin, maximum storage is  that of liquid water.
     if (T >= Tmin) then
-      canopywater_state%Unload = max(canopywater_state%CanopyStorage - wmax_tot, 0.0)
-      canopywater_state%CanopyStorage = canopywater_state%CanopyStorage - canopywater_state%Unload
+      canopywater_flux%Unload = max(canopywater_state%CanopyStorage - wmax_tot, 0.0)
+      canopywater_state%CanopyStorage = canopywater_state%CanopyStorage - canopywater_flux%Unload
     end if
 
     !----- Interception of rain or snow: asymptotic approach of saturation.
     !      based on: Hedstrom & Pomeroy 1998. Hydrol. Proc 12, 1611-1625;
     !                Koivusalo & Kokkonen 2002 J.Hydrol. 262, 145-164.
     if (T < Tmin) then
-      canopywater_state%Interc = (wmaxsnow_tot- canopywater_state%CanopyStorage) &
+      canopywater_flux%Interc = (wmaxsnow_tot- canopywater_state%CanopyStorage) &
                 * (1.0 - exp(-Prec/wmaxsnow_tot))
     end if
         
     ! Above Tmin, interception capacity equals that of liquid precip
     if (T >= Tmin) then
-      canopywater_state%Interc = max(0.0, (wmax_tot - canopywater_state%CanopyStorage)) &
+      canopywater_flux%Interc = max(0.0, (wmax_tot - canopywater_state%CanopyStorage)) &
                 * (1.0 - exp(-Prec/wmax_tot))
     end if
 
     ! update canopy storage after interception
-    canopywater_state%CanopyStorage =  canopywater_state%CanopyStorage + canopywater_state%Interc  ! new canopy storage, mm
-    canopywater_state%Trfall = Prec + canopywater_state%Unload - canopywater_state%Interc  ! Throughfall to field layer or snowpack
+    canopywater_state%CanopyStorage =  canopywater_state%CanopyStorage + canopywater_flux%Interc  ! new canopy storage, mm
+    canopywater_flux%Trfall = Prec + canopywater_flux%Unload - canopywater_flux%Interc  ! Throughfall to field layer or snowpack
 
     ! evaporate from canopy and update storage
-    canopywater_state%CanopyEvap = min(erate,  canopywater_state%CanopyStorage + eps)  ! mm
-    canopywater_state%CanopyStorage = canopywater_state%CanopyStorage - canopywater_state%CanopyEvap
+    canopywater_flux%CanopyEvap = min(erate,  canopywater_state%CanopyStorage + eps)  ! mm
+    canopywater_state%CanopyStorage = canopywater_state%CanopyStorage - canopywater_flux%CanopyEvap
 
     !---- Snowpack (in case no snow, all Trfall routed to floor) """
     if (T >= Tmelt) then
-      Melt = min(snowwater_state%SWEi, kmelt * (time_step*3600) * (T - Tmelt))  ! mm
+      Melt = min(canopywater_state%SWEi, spafhy_para%kmelt * (time_step*3600) * (T - Tmelt))  ! mm
       Freeze = 0.0
     else if (T < Tmelt) then
-      Freeze = min(snowwater_state%SWEl, kfreeze * (time_step*3600) * (Tmelt - T))  ! mm
+      Freeze = min(canopywater_state%SWEl, spafhy_para%kfreeze * (time_step*3600) * (Tmelt - T))  ! mm
       Melt = 0.0
     end if
 
     !---- amount of water as ice and liquid in snowpack
-    Sice = max(0.0, snowwater_state%SWEi + fS * canopywater_state%Trfall + Freeze - Melt)
-    Sliq = max(0.0, snowwater_state%SWEl + fW * canopywater_state%Trfall - Freeze + Melt)
+    Sice = max(0.0, canopywater_state%SWEi + fS * canopywater_flux%Trfall + Freeze - Melt)
+    Sliq = max(0.0, canopywater_state%SWEl + fW * canopywater_flux%Trfall - Freeze + Melt)
 
     ! The water that can not be hold by snow will penetrate to soil
-    snowwater_state%PotInf = max(0.0, Sliq - Sice * frac_snowliq)  ! mm,
-    Sliq   = max(0.0, Sliq - snowwater_state%PotInf)  ! mm, liquid water in snow
+    canopywater_flux%PotInf = max(0.0, Sliq - Sice * spafhy_para%frac_snowliq)  ! mm,
+    Sliq   = max(0.0, Sliq - canopywater_flux%PotInf)  ! mm, liquid water in snow
 
     ! update Snowpack state variables
-    snowwater_state%SWEl = Sliq
-    snowwater_state%SWEi = Sice
-    snowwater_state%swe  = snowwater_state%SWEl + snowwater_state%SWEi
+    canopywater_state%SWEl = Sliq
+    canopywater_state%SWEi = Sice
+    canopywater_state%swe  = canopywater_state%SWEl + canopywater_state%SWEi
         
     ! mass-balance error mm
-    canopywater_state%MBE = (canopywater_state%CanopyStorage + snowwater_state%swe) - & 
-                               (Wo + SWEo) - (Prec - canopywater_state%CanopyEvap - & 
-                               snowwater_state%PotInf)
+    canopywater_state%MBE = (canopywater_state%CanopyStorage + canopywater_state%swe) - & 
+                               (Wo + SWEo) - (Prec - canopywater_flux%CanopyEvap - & 
+                               canopywater_flux%PotInf)
 
   END SUBROUTINE canopy_water_snow
 
 
-  SUBROUTINE aerodynamics(LAI, Uo, ra, rb, ras, ustar, Uh, Ug)
+  SUBROUTINE aerodynamics(LAI, Uo, ra, rb, ras, ustar, Uh, Ug, spafhy_para)
     !
     ! computes wind speed at ground and canopy + boundary layer conductances
     ! Computes wind speed at ground height assuming logarithmic profile above and
@@ -406,6 +415,7 @@ contains
     ! !ARGUMENTS:
     real(8)      , intent(in)    :: LAI    ! one-sided leaf-area /plant area index (m2m-2)
     real(8)      , intent(in)    :: Uo     ! mean wind speed at reference height zm (ms-1)
+    type(spafhy_para_type), intent(in) :: spafhy_para
 
     real(8)      , intent(out)   :: ra         ! canopy aerodynamic resistance (sm-1)
     real(8)      , intent(out)   :: rb         ! canopy boundary layer resistance (sm-1)
@@ -415,33 +425,33 @@ contains
     real(8)      , intent(out)   :: Ug         ! wind speed at zg (ms-1)
 
     ! local variables
-    real(8)   :: zm1, zg1, alpha1, d, zom, zov, zosv, zn
+    real(8) :: zm1, zg1, alpha1, d, zom, zov, zosv, zn
     real(8) :: kv = 0.4  ! von Karman constant (-)
     real(8) :: beta_aero=285.0   ! s/m, from Campbell & Norman eq. (7.33) x 42.0 molm-3
 
-    zm1 = hc + zmeas  ! m
-    zg1 = min(zground, 0.1 * hc)
+    zm1 = spafhy_para%hc + spafhy_para%zmeas  ! m
+    zg1 = min(spafhy_para%zground, 0.1 * spafhy_para%hc)
     alpha1 = LAI / 2.0  ! wind attenuation coeff (Yi, 2008 eq. 23)
-    d = 0.66*hc     ! displacement height [m]
-    zom = 0.123*hc  ! roughness lenght for momentum [m]
+    d = 0.66*spafhy_para%hc     ! displacement height [m]
+    zom = 0.123*spafhy_para%hc  ! roughness lenght for momentum [m]
     zov = 0.1*zom   ! scalar roughness length [m]
-    zosv = 0.1*zo_ground ! soil scalar roughness length [m]
+    zosv = 0.1*spafhy_para%zo_ground ! soil scalar roughness length [m]
 
     ! solve ustar and U(hc) from log-profile above canopy
     ustar = Uo * kv / log((zm1 - d) / zom) 
-    Uh = ustar / kv * log((hc - d) / zom)
+    Uh = ustar / kv * log((spafhy_para%hc - d) / zom)
     
     ! U(zg) from exponential wind profile
-    zn = min(zg1 / hc, 1.0)  ! zground can't be above canopy top
+    zn = min(zg1 / spafhy_para%hc, 1.0)  ! zground can't be above canopy top
     Ug = Uh * exp(alpha1*(zn - 1.0))
 
     ! canopy aerodynamic & boundary-layer resistances (sm-1). Magnani et al. 1998 PCE eq. B1 & B5
     !ra = 1. / (kv*ustar) * log((zm - d) / zom)
     ra = 1./(kv**2.0 * Uo) * log((zm1-d)/zom) * log((zm1-d)/zov)    
-    rb = 1./LAI * beta_aero * ((w_leaf / Uh)*(alpha1/(1.0-exp(-alpha1/2.0))))**0.5
+    rb = 1./LAI * beta_aero * ((spafhy_para%w_leaf / Uh)*(alpha1/(1.0-exp(-alpha1/2.0))))**0.5
 
     ! soil aerodynamic resistance (sm-1)
-    ras = 1.0/(kv**2.0*Ug) * (log(zground/zo_ground))*log(zground/(zosv))
+    ras = 1.0/(kv**2.0*Ug) * (log(spafhy_para%zground/spafhy_para%zo_ground))*log(spafhy_para%zground/(zosv))
     
     ra = ra + rb
 
@@ -535,27 +545,28 @@ contains
   END SUBROUTINE e_sat
 
 
-  SUBROUTINE set_soilwaterState(soilwater_state)
+  SUBROUTINE set_soilwaterState(soilwater_state, spafhy_para)
   !-------------------------------------------
   ! Updates soil water state variables
   !-------------------------------------------
     ! !ARGUMENTS
     type(soilwater_type), intent(inout) :: soilwater_state                         ! 
+    type(spafhy_para_type), intent(in)  :: spafhy_para
   ! !LOCAL VARIABLES:  
     real(8)   :: eps=1e-16
     real(8)   :: psis
 
   ! root zone
-    soilwater_state%Wliq = max_poros * min(1.0, (soilwater_state%WatSto / soilwater_state%MaxWatSto))
-    soilwater_state%Sat  = soilwater_state%Wliq / max_poros
-    soilwater_state%Kh = ksat ! [m s-1] REVISE and replace by vanGenuchten -formulation
+    soilwater_state%Wliq =  spafhy_para%max_poros * min(1.0, (soilwater_state%WatSto / soilwater_state%MaxWatSto))
+    soilwater_state%Sat  = soilwater_state%Wliq / spafhy_para%max_poros
+    soilwater_state%Kh =  spafhy_para%ksat ! [m s-1] REVISE and replace by vanGenuchten -formulation
 
     call soil_water_retention_curve(soilwater_state%Wliq, psis) ! soil water potential [MPa]
     soilwater_state%Psi = psis
 
    ! organic top layer; maximum that can be hold is Fc
-    soilwater_state%Wliq_top = org_fc * min(1.0, (soilwater_state%WatStoTop / soilwater_state%MaxStoTop))
-    soilwater_state%beta = min(1.0, soilwater_state%Wliq_top / org_fc) ! modifier for soil evaporation [-]
+    soilwater_state%Wliq_top =  spafhy_para%org_fc * min(1.0, (soilwater_state%WatStoTop / soilwater_state%MaxStoTop))
+    soilwater_state%beta = min(1.0, soilwater_state%Wliq_top / spafhy_para%org_fc) ! modifier for soil evaporation [-]
 
    END SUBROUTINE set_soilwaterState
         
