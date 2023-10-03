@@ -176,7 +176,7 @@ program SVMC
   !********* open file for writing SpaFHy test outputs
   open(99, file = 'logbook.txt', status = 'old')
   write(99,*) "prec,T,Wliq,WliqTop,PsiS,Mbe,tr,ground_evap,infil,drain,roff,pondsto,swe,&
-      &swe_l,swe_i,canopy_evap,canopy_mbe,CanopyStorage,Trfall,LE, tr_phydro, gs, WatSto, WatStoTop"
+      &swe_l,swe_i,canopy_evap,canopy_mbe,CanopyStorage,Trfall,PotInf, LE, tr_phydro, gs, WatSto, WatStoTop"
   
   !*******************
   
@@ -330,8 +330,8 @@ program SVMC
         canopywater_flux%GroundEvap*1.0e-3, soilwater_flux%Inflow, soilwater_flux%Drain, soilwater_flux%Roff, &
         soilwater_state%PondSto, canopywater_state%swe, canopywater_state%SWEl, canopywater_state%SWEi, &
         canopywater_flux%CanopyEvap*1e-3, &
-        canopywater_state%MBE, canopywater_state%CanopyStorage, canopywater_flux%Trfall, LE, &
-        tr_phydro, gs, soilwater_state%WatSto, soilwater_state%WatStoTop
+        canopywater_state%MBE, canopywater_state%CanopyStorage, canopywater_flux%Trfall, canopywater_flux%PotInf, &
+        LE, tr_phydro, gs, soilwater_state%WatSto, soilwater_state%WatStoTop
 
         if ( mod(tot_hour,time_step_output) .eq. 0.0 ) then
             
