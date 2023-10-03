@@ -175,8 +175,8 @@ program SVMC
 
   !********* open file for writing SpaFHy test outputs
   open(99, file = 'logbook.txt', status = 'old')
-  write(99,*) "prec,T,Wliq,WliqTop,PsiS,Mbe,tr_spafhy,ground_evap,infil,drain,roff,pondsto,swe,&
-      &swe_l,swe_i,canopy_evap,canopy_mbe,CanopyStorage,Trfall,LE"
+  write(99,*) "prec,T,Wliq,WliqTop,PsiS,Mbe,tr,ground_evap,infil,drain,roff,pondsto,swe,&
+      &swe_l,swe_i,canopy_evap,canopy_mbe,CanopyStorage,Trfall,LE, tr_phydro, gs, WatSto, WatStoTop"
   
   !*******************
   
@@ -294,7 +294,7 @@ program SVMC
           ! call SpaFHy code to compute new canopywater_state and snowwater_state
           ! returns water fluxes integrated over time_step in units [mm = kg H2O m-2]
           call initialization_spafhy_flux(canopywater_flux, soilwater_flux)
-          
+
           call canopy_water_flux(rn, temp-273.15, prec, vpd, wind, pres, fapar, lai, &
                                   canopywater_state, canopywater_flux, soilwater_state, spafhy_para)
 
@@ -330,7 +330,8 @@ program SVMC
         canopywater_flux%GroundEvap*1.0e-3, soilwater_flux%Inflow, soilwater_flux%Drain, soilwater_flux%Roff, &
         soilwater_state%PondSto, canopywater_state%swe, canopywater_state%SWEl, canopywater_state%SWEi, &
         canopywater_flux%CanopyEvap*1e-3, &
-        canopywater_state%MBE, canopywater_state%CanopyStorage, canopywater_flux%Trfall, LE
+        canopywater_state%MBE, canopywater_state%CanopyStorage, canopywater_flux%Trfall, LE, &
+        tr_phydro, gs, soilwater_state%WatSto, soilwater_state%WatStoTop
 
         if ( mod(tot_hour,time_step_output) .eq. 0.0 ) then
             
