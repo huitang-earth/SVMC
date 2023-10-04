@@ -212,10 +212,6 @@ program SVMC
               soilmoist=soilmoist_matrix(1,1,1)               
               call soil_water_retention_curve(soilmoist, psi_soil)
               step_soilmoist=step_soilmoist+1
-            else
-              !psi_soil = -1.0
-              psi_soil = soilwater_state%Psi !root zone, MPa
-              !psi_soil = min(-eps, max(psi_soil, -2.0))  ! ensures psi_soil <0 and >-2.0 MPa
             end if
 
           end if
@@ -237,6 +233,7 @@ program SVMC
           co2=co2_matrix(1,1,1) 
           wind=wind_matrix(1,1,1)
           
+
           step_clim=step_clim+1
           ! end if
 
@@ -244,6 +241,11 @@ program SVMC
           ! At what time scale the optimization should work need to be tested!!!!
           
           rdark=0.0
+          if(.not. obs_soilmoist) then
+            !psi_soil = -1.0
+             psi_soil = soilwater_state%Psi !root zone, MPa
+            !psi_soil = min(-eps, max(psi_soil, -2.0))  ! ensures psi_soil <0 and >-2.0 MPa
+          end if
 
           print *, "temp =", temp-273.15                  ! unit should be C
           print *, "ppfd =", ppfd*1000000.0/lai          ! umol/m2/s, current unit is wrong
@@ -257,6 +259,7 @@ program SVMC
           print *, "fapar =", fapar                      ! frac
           !print *, "vol_liq =", vol_liq
           print *, "psi_soil =", psi_soil         ! MPa
+
           
           ! for coupling with SpaFHy: psi_soil = soilwater_state%Psi
           call pmodel_hydraulics_numerical(temp-273.15, ppfd*1000000.0/lai, vpd, co2*1000000, pres, fapar, &
