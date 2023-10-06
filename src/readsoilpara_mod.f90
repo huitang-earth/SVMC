@@ -64,44 +64,7 @@ implicit none
   real(8) :: watres  !Launiainen et al. 2022: C1-5: 0.0
   real(8) :: alpha_van   !Launiainen et al. 2022: C1-5: 4.45, 5.92, 2.02, 4.49, 3.35
   real(8) :: watsat  !Launiainen et al. 2022: C1-5: 0.75, 0.68, 0.46, 0.47, 0.54  
-
   
-  
-  !----------------------------
-  ! Soil properties for yasso
-  !-----------------------------
-  !real(r8), parameter :: days_yr = 365.0
-  !integer, parameter, public :: statesize_yasso = 5
-
-! The yasso parameter vector:
-! 1-16 matrix A entries: 4*alpha, 12*p
-! 17-21 Leaching parameters: w1,...,w5 IGNORED IN THIS FUNCTION
-! 22-23 Temperature-dependence parameters for AWE fractions: beta_1, beta_2
-! 24-25 Temperature-dependence parameters for N fraction: beta_N1, beta_N2
-! 26-27 Temperature-dependence parameters for H fraction: beta_H1, beta_H2
-! 28-30 Precipitation-dependence parameters for AWE, N and H fraction: gamma, gamma_N, gamma_H
-! 31-32 Humus decomposition parameters: p_H, alpha_H (Note the order!)
-! 33-35 Woody parameters: theta_1, theta_2, r 
-
-! The Yasso20 maximum a posteriori parameters:
-  !integer, public :: num_params_y20
-  !real, public :: param_y20_map(num_params_y20)
-
-  ! Nitrogen-specific parameters
-  !real, public :: nc_mb ! N-C ratio of the microbial biomass 
-  !real, public :: cue_min  ! minimum microbial carbon use efficiency
-  !real, public :: nc_h_max ! N-C ratio of the H pool
-
-  ! AWENH composition from Palosuo et al. (2015), for grasses. For now, we'll use the same
-  ! composition for both above and below ground inputs. The last values (H) are always 0.
-  !real :: awenh_fineroot(statesize_yasso)
-  !real :: awenh_leaf(statesize_yasso)
-  ! A soil amendment consisting of soluble carbon (and nitrogen)
-  !real :: awenh_soluble(statesize_yasso)
-  ! From Heikkinen et al 2021, composted horse manure with straw litter
-  !real :: awenh_compost(statesize_yasso)
-
-  !integer, parameter, public :: met_ind_init = 1
 
 contains
 
@@ -166,80 +129,7 @@ contains
   end subroutine readsoilhydro_namelist
 
 
-!  subroutine readsoilyasso_namelist
   
-!    implicit none
-
-!    logical :: old
-!    integer :: readerror
-!    integer,parameter :: unitsoilyasso=4
-
-!    old=.false.
-
-!    namelist /soilyasso_namelist/ &
-!       param_y20_map
-!       nc_mb
-!       cue_min
-!       nc_h_max
-!       awenh_fineroot
-!       awenh_leaf
-!       awenh_soluble
-!       awenh_compost
-    
-  ! Presetting namelist command
-!    param_y20_map(num_params_y20) = (/ &
-!     0.51, &
-!     5.19, &
-!     0.13, &
-!     0.1, &
-!     0.5, &
-!     0., &
-!     1., &
-!     1., &
-!     0.99, &
-!     0., &
-!     0., &
-!     0., &
-!     0., &
-!     0., &
-!     0.163, &
-!     0., &
-!     -0., &
-!     0., &
-!     0., &
-!     0., &
-!     0., &
-!     0.158, &
-!     -0.002, &
-!     0.17, &
-!     -0.005, &
-!     0.067, &
-!     -0., &
-!     -1.44, &
-!     -2.0, &
-!     -6.9, &
-!     0.0042, &
-!     0.0015, &
-!     -2.55, &
-!     1.24, &
-!     0.25/)
-!    nc_mb = 0.1
-!    cue_min = 0.1
-!    nc_h_max = 0.1
-!    awenh_fineroot(statesize_yasso) = (/0.46, 0.32, 0.04, 0.18, 0.0/)
-!    awenh_leaf(statesize_yasso) = (/0.46, 0.32, 0.04, 0.18, 0.0/)
-!    awenh_soluble(statesize_yasso) = (/0.0, 1.0, 0.0, 0.0, 0.0/)
-!    awenh_compost(statesize_yasso) = (/0.69, 0.09, 0.02, 0.20, 0.0/)
-
-  ! Reading namelist
-!    open(unitsoilyasso, file='./soilyasso_namelist', status='old', form='formatted', err=999)
-!    read(unitsoilyasso, soilyasso_namelist, iostat=readerror)
-!    close(unitsoilyasso)
-
-!999 write(*,*) ' #### MODEL ERROR! FILE "soilyasso_namelist"    #### '
-!    write(*,*) ' #### CANNOT BE OPENED IN THE DIRECTORY       #### '
-!    stop
-!  end subroutine readsoilyasso_namelist
 
 END MODULE readsoilpara_mod
 
