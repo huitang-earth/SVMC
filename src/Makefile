@@ -35,13 +35,12 @@ linpack.o \
 lbfgsb.o \
 phydro_mod.o \
 spafhy_mod.o \
+yasso.o \
+wrapper_yasso.o \
 juldate.o
 
 OBJECTS = \
 SVMC.o
-
-
-
 
 
 $(MAIN): $(MODOBJS) $(OBJECTS) 
