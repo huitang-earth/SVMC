@@ -329,11 +329,11 @@ program SVMC
         ! *** test output for de-bugging
         write(99,'(*(G0.6,:,","))') & 
         prec, temp - 273.15, soilwater_state%Wliq, soilwater_state%Wliq_top, &
-        soilwater_state%Psi, soilwater_state%mbe, tr_spafhy, &
+        soilwater_state%Psi, soilwater_flux%mbe, tr_spafhy, &
         canopywater_flux%GroundEvap*1.0e-3, soilwater_flux%Inflow, soilwater_flux%Drain, soilwater_flux%Roff, &
         soilwater_state%PondSto, canopywater_state%swe, canopywater_state%SWEl, canopywater_state%SWEi, &
         canopywater_flux%CanopyEvap*1e-3, &
-        canopywater_state%MBE, canopywater_state%CanopyStorage, canopywater_flux%Trfall, canopywater_flux%PotInf, &
+        canopywater_flux%MBE, canopywater_state%CanopyStorage, canopywater_flux%Trfall, canopywater_flux%PotInf, &
         LE, tr_phydro, gs, soilwater_state%WatSto, soilwater_state%WatStoTop
 
         if ( mod(tot_hour,time_step_output) .eq. 0.0 ) then

@@ -174,7 +174,7 @@ contains
     call set_soilwaterState(soilwater_state, spafhy_para)
 
     ! mass balance error [m]
-    soilwater_state%mbe = (soilwater_state%WatSto - WatSto0)  &
+    soilwater_flux%mbe = (soilwater_state%WatSto - WatSto0)  &
                      + (soilwater_state%WatStoTop - WatStoTop0) &
                      + (soilwater_state%PondSto - PondSto0) &
                      - (rr + retflow - tr - evap1 - soilwater_flux%Drain - soilwater_flux%Roff)
@@ -418,7 +418,7 @@ contains
     canopywater_state%swe  = canopywater_state%SWEl + canopywater_state%SWEi
         
     ! mass-balance error mm
-    canopywater_state%MBE = (canopywater_state%CanopyStorage + canopywater_state%swe) - & 
+    canopywater_flux%MBE = (canopywater_state%CanopyStorage + canopywater_state%swe) - & 
                                (Wo + SWEo) - (Prec - canopywater_flux%CanopyEvap - & 
                                canopywater_flux%PotInf)
 

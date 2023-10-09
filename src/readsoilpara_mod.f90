@@ -14,7 +14,6 @@ implicit none
     real(8)  :: Sat   ! saturation ratio (-), root zone
     real(8)  :: Kh   ! Hydraulic conductivity at Sat [m s-1]
     real(8)  :: beta    ! modifier for soil evaporation rate, WliqTop/FCtop
-    real(8)  :: mbe     ! [m] - mass balance error
   end type soilwater_state_type
 
   type, public :: soilwater_flux_type
@@ -22,14 +21,14 @@ implicit none
     real(8)  :: Roff    ! [m] - surface runoff -"-
     real(8)  :: Drain   ! [m] - drainage from root zone -"-
     real(8)  :: Interc  ! [m] - interception of top layer -"-
+    real(8)  :: mbe     ! [m] - mass balance error
   end type soilwater_flux_type
 
   type, public :: canopywater_state_type
     real(8) :: CanopyStorage ! canopy water storage (mm = kg m-2(ground)) 
     real(8) :: swe        ! [mm] snow water equivalent
     real(8) :: SWEi      ! [mm] snow water equivalent as ice
-    real(8) :: SWEl     ! [mm] snow water equivalent as liquid
-    real(8) :: MBE       ! mass balance error (mm)      
+    real(8) :: SWEl     ! [mm] snow water equivalent as liquid 
   end type canopywater_state_type
 
   type, public :: canopywater_flux_type
@@ -41,6 +40,7 @@ implicit none
     real(8) :: ET         ! total evapo-transpiration (mm)
     real(8) :: Transpi    ! transpiration rate (mm)  
     real(8) :: PotInf     ! potential infiltration to soil profile (mm)    
+    real(8) :: MBE       ! mass balance error (mm)     
   end type canopywater_flux_type
 
 ! Hydraulic properties (organic layer & soil) for spafhy
