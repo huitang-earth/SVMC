@@ -45,7 +45,8 @@ contains
                smvar_id, smpvar_id, cyvar_id, abvar_id, tbvar_id, lcvar_id, rcvar_id, fpvar_id, &
                namedim_id, jmvar_id, vcvar_id, dpsivar_id, chivar_id, provar_id, &
                cevvar_id, gevvar_id, tfvar_id, civar_id, ulvar_id, pivar_id, rfvar_id, &
-               invar_id, drvar_id, tsivar_id, psvar_id, wsvar_id,wstvar_id, csvar_id, swevar_id,
+               invar_id, drvar_id, tsivar_id, psvar_id, wsvar_id,wstvar_id, csvar_id, swevar_id
+               
     integer :: nx_lon=1, ny_lat=1, ntim
     integer :: yyyy,mm,dd,hh,mi,ss
 
