@@ -67,12 +67,6 @@ program SVMC
   real(8)     ::    rdark     
 
   real(8), dimension(1,1,1)  :: lai_matrix, soilmoist_matrix
-  real(8), dimension(1,1,1)  :: temp_matrix, ppfd_matrix, rg_matrix, prec_matrix, &
-                                sh_matrix, rh_matrix, vpd_matrix, wind_matrix, &
-                                pres_matrix, co2_matrix, gpp_matrix, &
-                                jmax_matrix, vcmax_matrix, dpsi_matrix, &
-                                chi_matrix, profit_matrix, gs_matrix, &
-                                evap_matrix, psi_soil_matrix, soilmoist1_matrix
 
   real(8)     ::    lai
 
@@ -346,32 +340,38 @@ program SVMC
             call netCDF_prepareOUTPUT(output_filename_hr, lon_sites, lat_sites, ntim_out_hr)
           end if
 
-          gpp_matrix(1,1,1)   =gpp
-          gs_matrix(1,1,1)    =gs
-          jmax_matrix(1,1,1)  =jmax
-          vcmax_matrix(1,1,1) =vcmax
-          chi_matrix(1,1,1)   =chi
-          dpsi_matrix(1,1,1)  =dpsi
-          profit_matrix(1,1,1)=profit
-          soilmoist1_matrix(1,1,1)=soilwater_state%Wliq
-          !psi_soil_matrix(1,1,1)=psi_soil_spafhy
-          psi_soil_matrix(1,1,1)=soilwater_state%Psi ! MPa
-          evap_matrix(1,1,1)=canopywater_flux%ET
           print *, "step_nc_hr=", step_nc_hr
 
-          call netCDF_writeOUTPUT(output_filename_hr, "GPP", gpp_matrix, tot_hour/24.0, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "stomatal_conductance", gs_matrix, tot_hour/24.0, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "Jmax", jmax_matrix, tot_hour/24.0, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "Vcmax", vcmax_matrix, tot_hour/24.0, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "Chi", chi_matrix, tot_hour/24.0, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "Dpsi", dpsi_matrix, tot_hour/24.0, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "Profit", profit_matrix, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "GPP", gpp, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "stomatal_conductance", gs, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "Jmax", jmax, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "Vcmax", vcmax, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "Chi", chi, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "Dpsi", dpsi, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "Profit", profit, tot_hour/24.0, step_nc_hr)
 
-          call netCDF_writeOUTPUT(output_filename_hr, "Evap", evap_matrix, tot_hour/24.0, step_nc_hr)
-          !call netCDF_writeOUTPUT(output_filename_hr, "Transp", tr, tot_hour/24, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "SoilMoist", soilmoist1_matrix, tot_hour/24.0, step_nc_hr)
-          print *, "psi=", psi_soil_matrix, soilmoist1_matrix
-          call netCDF_writeOUTPUT(output_filename_hr, "SoilMoistPot", psi_soil_matrix, tot_hour/24.0, step_nc_hr)
+          !Use common unit [mm s-1] ≈ [kg H2O m-2 s-1] for flux
+          call netCDF_writeOUTPUT(output_filename_hr, "Evap", canopywater_flux%ET/(time_step*3600.0), tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "Transp", tr_spafhy*1e3/(time_step*3600.0), tot_hour/24, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "CanopyEvap", canopywater_flux%CanopyEvap/(time_step*3600.0), tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "GroundEvap", canopywater_flux%GroundEvap/(time_step*3600.0), tot_hour/24, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "Trfall", canopywater_flux%Trfall/(time_step*3600.0), tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "CanopyInterc", canopywater_flux%Interc/(time_step*3600.0), tot_hour/24, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "PotInf", canopywater_flux%PotInf/(time_step*3600.0), tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "Unload", canopywater_flux%Unload/(time_step*3600.0), tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "Roff", soilwater_flux%Roff*1e3/(time_step*3600.0), tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "Drain", soilwater_flux%Drain*1e3/(time_step*3600.0), tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "Inflow", soilwater_flux%Inflow*1e3/(time_step*3600.0), tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "TopSoilInterc", soilwater_flux%Interc*1e3/(time_step*3600.0), tot_hour/24.0, step_nc_hr)                    
+         
+          !Use the units used by original spafhy: [m] for soil water storage, [mm] for canopy water storage
+          call netCDF_writeOUTPUT(output_filename_hr, "WatSto", soilwater_state%WatSto, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "PondSto", soilwater_state%PondSto, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "WatStoTop", soilwater_state%WatSto, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "SoilMoist", soilwater_state%Wliq, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "SoilMoistPot", soilwater_state%Psi, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "CanopyStorage", canopywater_state%CanopyStorage, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "swe", canopywater_state%swe, tot_hour/24.0, step_nc_hr)
           
           step_nc_hr= step_nc_hr+1 
         endif
