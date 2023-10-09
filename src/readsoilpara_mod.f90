@@ -38,7 +38,7 @@ implicit none
     real(8) :: Unload     ! undloading from canopy storage (mm)    
     real(8) :: GroundEvap ! evaporation from ground (mm)   
     real(8) :: ET         ! total evapo-transpiration (mm)
-    real(8) :: Transpi    ! transpiration rate (mm)  
+    real(8) :: Transpi    ! transpiration rate (mm ≈ kg H2O m-2 s-1)  Hui: This is not used currently.....
     real(8) :: PotInf     ! potential infiltration to soil profile (mm)    
     real(8) :: MBE       ! mass balance error (mm)     
   end type canopywater_flux_type
