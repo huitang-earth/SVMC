@@ -37,6 +37,7 @@ phydro_mod.o \
 spafhy_mod.o \
 yasso.o \
 wrapper_yasso.o \
+allocation.o  \
 juldate.o
 
 OBJECTS = \

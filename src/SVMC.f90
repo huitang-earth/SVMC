@@ -29,6 +29,7 @@ program SVMC
   !use alloc_mod                ! module for carbon allocation and yield
   use wrapper_yasso             ! module for soil decomposition model, which will provide heterogeneous respiration (hr)   
   use yasso
+  use allocation 
 
   implicit none
 
@@ -72,7 +73,7 @@ program SVMC
                                 chi_matrix, profit_matrix, gs_matrix, &
                                 evap_matrix, psi_soil_matrix, soilmoist1_matrix, tmp_matrix
 
-  real(8)     ::    lai
+  real(8)     ::    lai, lai_alloc
 
   real(8)    :: jmax       !  The maximum rate of RuBP regeneration (umol/m2/s) at growth temperature (argument\code{tc}), calculated using
                                                 ! \deqn{A_J = A_C} 
@@ -96,6 +97,11 @@ program SVMC
   real(8)    :: HeteroResp, AutoResp,TotalResp
   real    :: leaf_litter_c, root_litter_c, soluble=0.0, compost=0.0
 
+  ! alloc variables
+  real(8)    :: croot=0.0, cleaf=0.0, cstem=0.0
+  real(8)    :: above_biomass, below_biomass, yield
+  integer    :: pheno_stage=1, management_type=0
+
   ! For soil water retention curve
  ! real(8) :: watsat      ! v/v saturate moisture
   !real(8) :: watres      ! v/v, residual soil moisture for Van Genuchten
@@ -112,6 +118,9 @@ program SVMC
   type(soilcn_state_type)       :: soilcn_state
   type(soilcn_flux_type)        :: soilcn_flux
   type(yasso_para_type)         :: yasso_para
+  type(alloc_para_type)         :: alloc_para
+  type(management_para_type)    :: manage_para
+
 
   !character(len=200)  ::
   !real,dimension(:,:), allocatable
@@ -421,8 +430,16 @@ program SVMC
             
           !call litter_input(npp_sum, pheno_stage, management, leaf_litter_c, root_litter_c, root_exudent_c)  
           !HT: Some sensitivity test with harvest residues input
-          leaf_litter_c= gpp_day * 0.5 * 0.5 * 0.5 * 3600 * 24
-          root_litter_c= gpp_day * 0.5 * 0.5 * 0.5 * 3600 * 24
+          !leaf_litter_c= gpp_day * 0.5 * 0.5 * 0.5 * 3600 * 24
+          !root_litter_c= gpp_day * 0.5 * 0.5 * 0.5 * 3600 * 24
+        
+          !call alloc_hypothesis_1(gpp_day, npp_day,  leaf_litter_c, root_litter_c, alloc_para)
+          !AutoResp=gpp_day*0.5*3600*24
+          call alloc_hypothesis_2(gpp_day, npp_day, AutoResp, croot, cleaf, cstem, leaf_litter_c, root_litter_c, &
+                                  above_biomass, below_biomass, yield, &
+                                  lai_alloc, alloc_para, manage_para, pheno_stage, management_type)
+          
+
 
           ! Yasso: split input c into various yasso fractions
       !   end if
@@ -459,7 +476,6 @@ program SVMC
              soilcn_flux%ctend(3), soilcn_flux%ctend(4), soilcn_flux%ctend(5), soilcn_flux%ntend
 
           HeteroResp= sum(-soilcn_flux%ctend)
-          AutoResp=gpp_day*0.5*3600*24
           TotalResp=HeteroResp+AutoResp
           
           ! We could also put yasso here can do the daily calculation for NEE
@@ -478,6 +494,15 @@ program SVMC
           call netCDF_writeOUTPUT(output_filename_day, "AutoResp", tmp_matrix, tot_hour/24.0, step_nc_day)         
           tmp_matrix(1,1,1)=TotalResp
           call netCDF_writeOUTPUT(output_filename_day, "TotalResp", tmp_matrix, tot_hour/24.0, step_nc_day) 
+          tmp_matrix(1,1,1)=lai_alloc
+          call netCDF_writeOUTPUT(output_filename_day, "LAI", tmp_matrix, tot_hour/24.0, step_nc_day) 
+          tmp_matrix(1,1,1)=above_biomass + below_biomass
+          call netCDF_writeOUTPUT(output_filename_day, "TotLivBiom", tmp_matrix, tot_hour/24.0, step_nc_day)
+          tmp_matrix(1,1,1)=cleaf
+          call netCDF_writeOUTPUT(output_filename_day, "leaf_carbon_content", tmp_matrix, tot_hour/24.0, step_nc_day)  
+          tmp_matrix(1,1,1)=croot
+          call netCDF_writeOUTPUT(output_filename_day, "root_carbon_content", tmp_matrix, tot_hour/24.0, step_nc_day) 
+
           step_nc_day= step_nc_day+1                
 
       !    gpp_sum_day =0
