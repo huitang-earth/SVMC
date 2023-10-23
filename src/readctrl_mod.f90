@@ -60,10 +60,10 @@ contains
     old=.false.
     
     ! Presetting namelist command
-    start_date_day  =20210601 !20210101
+    start_date_day  =20210101 !20210601
     start_date_hour =000000
     time_step       =1               ! hours
-    end_date_day    =20210615 !20211231
+    end_date_day    =20211231 !
     end_date_hour   =000000
     num_sites       =1                 ! number of sites, should also be read from input file?
     ! lon_sites     = (/ /)            ! longitude of sites (not needed, can be well defined input file)
