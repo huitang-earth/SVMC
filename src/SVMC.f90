@@ -34,13 +34,16 @@ program SVMC
   ! Loop variables
   !***********************************
   integer         :: i, m
-  integer         :: step_nc_hr, step_nc_day, step_clim, step_lai
+  integer         :: step_nc_hr, step_nc_day, step_clim, step_lai, step_soilmoist
   real(kind=dp)   :: tot_hour, tot_hour_end, juldate, start_date, end_date
   real(8), dimension(1)     :: start_clim_time, end_clim_time
-  real(8)            :: start_clim_juldate,start_lai_juldate    
+  real(8)            :: start_clim_juldate,start_lai_juldate,start_soilmoist_juldate   
   real(8), dimension(1)    :: start_lai_time, end_lai_time 
   integer         :: ntim_clim, ntim_lai, ntim_out_hr, ntim_out_day
  
+  ! epsilon
+  real(8) :: eps = 1e-16
+
   !***********************************
   !Model variables
   !***********************************
@@ -66,10 +69,7 @@ program SVMC
   real(8), dimension(1,1,1)  :: lai_matrix, soilmoist_matrix
   real(8), dimension(1,1,1)  :: temp_matrix, ppfd_matrix, rg_matrix, prec_matrix, &
                                 sh_matrix, rh_matrix, vpd_matrix, wind_matrix, &
-                                pres_matrix, co2_matrix, gpp_matrix, &
-                                jmax_matrix, vcmax_matrix, dpsi_matrix, &
-                                chi_matrix, profit_matrix, gs_matrix, &
-                                evap_matrix, psi_soil_matrix, soilmoist1_matrix
+                                pres_matrix, co2_matrix
 
   real(8)     ::    lai
 
@@ -90,7 +90,9 @@ program SVMC
   ! spafhy variables
   real(8)    :: tr_spafhy   ! Transpiration estimated by spafhy model
   real(8)    :: retflow     ! return flow from ground water [m]
-  
+  real(8)    :: LE          ! latent heat flux [Wm-2]
+  real(8)    :: LatentHeat  ! latent heat of vaporization [J kg-1]
+
   ! For soil water retention curve
  ! real(8) :: watsat      ! v/v saturate moisture
   !real(8) :: watres      ! v/v, residual soil moisture for Van Genuchten
@@ -100,9 +102,11 @@ program SVMC
   !real(8) :: n1, m1, alpha_van           ! (-), pore-size-distribution parameter for Van Genuchten 1.07
   !real(8) :: eff_porosity! v/v, volume of ice
 
-  type(soilwater_type)          :: soilwater_state  
-  type(canopywater_type)        :: canopywater_state
-  type(snowwater_type)        :: snowwater_state
+  type(soilwater_state_type)          :: soilwater_state
+  type(soilwater_flux_type)           :: soilwater_flux  
+  type(canopywater_state_type)        :: canopywater_state
+  type(canopywater_flux_type)         :: canopywater_flux
+  type(spafhy_para_type)              :: spafhy_para
 
   !character(len=200)  ::
   !real,dimension(:,:), allocatable
@@ -123,10 +127,10 @@ program SVMC
   ! psi_soil=0
   call readctrl_namelist
   call readvegpara_namelist
-  call readsoilhydro_namelist
+  call readsoilhydro_namelist(spafhy_para)
 
   !call set_soilwaterState(soilwater_state, canopywater_state)
-  call initialization_spafhy(canopywater_state, snowwater_state, soilwater_state)
+  call initialization_spafhy(canopywater_state, soilwater_state, spafhy_para)
 
 
   !***********************************
@@ -157,12 +161,22 @@ program SVMC
   ! To simplify the time management, specify the julian start date of the inputdata by hand.
   start_clim_juldate=juldate(20201231,233000)
   start_lai_juldate =juldate(20210101,000000)
+  start_soilmoist_juldate =juldate(20210101,000000)
   
   ! step the starting time steps for reading input files
   step_clim = floor((start_date-start_clim_juldate)*24)+1
   step_lai  = floor(start_date-start_lai_juldate)+1
+  step_soilmoist = floor(start_date-start_soilmoist_juldate)+1
 
-  print *, num_sites, lat_sites, lon_sites, tot_hour, num_pft   
+  print *, num_sites, lat_sites, lon_sites, tot_hour, num_pft
+
+  !********* open file for writing SpaFHy test outputs
+  open(99, file = 'logbook.txt', status = 'old')
+  write(99,*) "prec,T,Wliq,WliqTop,PsiS,Mbe,tr,ground_evap,infil,drain,roff,pondsto,swe,&
+      &swe_l,swe_i,canopy_evap,canopy_mbe,CanopyStorage,Trfall,PotInf, LE, tr_phydro, gs, WatSto, WatStoTop"
+  
+  !*******************
+  
   ! Loop over time, and locations
   do while (tot_hour .lt. tot_hour_end)  ! in hour or 30 minutes, time loop 
     
@@ -181,31 +195,22 @@ program SVMC
           ! Only update LAI daily
 
           if (mod(tot_hour,24.0) .eq. 0) then
-            call netCDF_readlai(input_laifile, lai_matrix, step_lai)
-            call netCDF_readsoilmoist('../data/FieldObs_Qvidja.2021.soilmoist.nc', soilmoist_matrix, step_lai)
             
-            lai=lai_matrix(1,1,1)
-            soilmoist=soilmoist_matrix(1,1,1)             
-            
-            call soil_water_retention_curve(soilmoist, psi_soil)
-            ! add soil rentention curve here to test soil water potential calculation
-            !n1=1.07       !Launiainen et al. 2022: C1-5: 1.12, 1.14, 1.07, 1.27, 1.18  
-            !m1=1.0/n1  
-            !watres=0.0   !Launiainen et al. 2022: C1-5: 0.0
-            !alpha_van=2.02   !Launiainen et al. 2022: C1-5: 4.45, 5.92, 2.02, 4.49, 3.35
-            !watsat=0.46  !Launiainen et al. 2022: C1-5: 0.75, 0.68, 0.46, 0.47, 0.54  
+            if (obs_lai) then
+              call netCDF_readlai(input_laifile, lai_matrix, step_lai)
+              lai=lai_matrix(1,1,1)
+              step_lai=step_lai+1
+              ! calculate fapar:
+              fapar= 1-exp(-k*lai)
+            end if
 
-            !vol_liq=soilmoist
-            !vol_ice = 0.0   
-            !eff_porosity = max(0.01, watsat-vol_ice)
-    
-            !satfrac  = (vol_liq-watres)/(eff_porosity-watres)
-            !print *, "satfrac=", satfrac 
-            !psi_soil = -(1.0/alpha_van)*(satfrac**(1.0/(m1-1.0)) - 1.0 )**m1  ! psi_soil in kPa
+            if (obs_soilmoist) then
+              call netCDF_readsoilmoist('../data/FieldObs_Qvidja.2021.soilmoist.nc', soilmoist_matrix, step_soilmoist)
+              soilmoist=soilmoist_matrix(1,1,1)               
+              call soil_water_retention_curve(soilmoist, psi_soil)
+              step_soilmoist=step_soilmoist+1
+            end if
 
-            ! calculate fapar:
-            step_lai=step_lai+1
-            fapar= 1-exp(-k*lai)
           end if
 
           ! Determine whether to read new climate variables
@@ -214,7 +219,7 @@ program SVMC
                        sh_matrix, rh_matrix, vpd_matrix, pres_matrix, &
                        co2_matrix, wind_matrix, step_clim)
 
-          temp=temp_matrix(1,1,1)
+          temp=temp_matrix(1,1,1) ! deg C or K???
           ppfd=ppfd_matrix(1,1,1)
           rg  = rg_matrix(1,1,1)
           prec=prec_matrix(1,1,1)
@@ -225,6 +230,7 @@ program SVMC
           co2=co2_matrix(1,1,1) 
           wind=wind_matrix(1,1,1)
           
+
           step_clim=step_clim+1
           ! end if
 
@@ -232,6 +238,11 @@ program SVMC
           ! At what time scale the optimization should work need to be tested!!!!
           
           rdark=0.0
+          if(.not. obs_soilmoist) then
+            !psi_soil = -1.0
+             psi_soil = soilwater_state%Psi !root zone, MPa
+            !psi_soil = min(-eps, max(psi_soil, -2.0))  ! ensures psi_soil <0 and >-2.0 MPa
+          end if
 
           print *, "temp =", temp-273.15                  ! unit should be C
           print *, "ppfd =", ppfd*1000000.0/lai          ! umol/m2/s, current unit is wrong
@@ -244,10 +255,12 @@ program SVMC
           print *, "pres =", pres                        ! pa
           print *, "fapar =", fapar                      ! frac
           !print *, "vol_liq =", vol_liq
-          print *, "psi_soil =", psi_soil*0.001          ! convert from Kpa to MPa
+          print *, "psi_soil =", psi_soil         ! MPa
 
+          
+          ! for coupling with SpaFHy: psi_soil = soilwater_state%Psi
           call pmodel_hydraulics_numerical(temp-273.15, ppfd*1000000.0/lai, vpd, co2*1000000, pres, fapar, &
-                                 psi_soil*0.001, rdark,                                                 &
+                                 psi_soil, rdark,                                                 &
                                  jmax, dpsi, gs, aj, ci, chi, vcmax, profit, chi_jmax_lim            &
                                  )
           
@@ -258,38 +271,67 @@ program SVMC
           ! Carbon allocation: update gpp, npp, ar ....
           ! call carbon_allocation_hr(a,....)          
         
-          ! Update transpiration, canopy evaporation...
-          ! CanopyGrid in spafhy...
-          ! in mm/s H20
+          ! Solve plant canopy and soil water budget
+          
           ! Transpiration derived from P-hydro
-
-          tr_phydro = 1.6*gs*(vpd/pres)*h2o_molmass/density_h2o(temp-273.15, pres)     
+          ! HUI - check units of gs and conversion to tr_phydro. We want it to be ≈ kg H2O m-2 s-1] 
+          ! [tr_phydro] [mm s-1] = [1] * [mol/m2/s] * [Pa Pa-1] * [g mol-1] / [kg m-3]  
+          ! Density of water is used here to more accurately convert the unit to mm -s
+          if (ISNAN(gs)) then
+            tr_phydro = 0.0
+          else
+             tr_phydro = 1.6*gs*(vpd/pres)*h2o_molmass/density_h2o(temp-273.15, pres) * lai
+          end if
+          ! net radiation of the whole canopy-soil system [W m-2]
+          ! Samuli will revise later!
           rn= rg * 0.7
           !rn = max(2.57*lai/(2.57*lai+0.57)-0.2, 0.55)*rg  ! Launiainen et al. 2016 GCB, fit to Fig 2a
 
-          call canopy_water_flux(gs, rn, temp-273.15, prec, ppfd, vpd,  &
-                                  wind, co2*1000000, soilwater_state%Rew, & 
-                                  pres, lai, canopywater_state, snowwater_state)       
+          !call canopy_water_flux(gs, rn, temp-273.15, prec, ppfd, vpd,  &
+          !                        wind, co2*1000000, soilwater_state%Rew, & 
+          !                        pres, lai, canopywater_state, snowwater_state)       
           
-          ! Everything is in the unit of mm/s, no need to multiply dt?
-          canopywater_state%ET =  tr_phydro +  canopywater_state%Efloor +     &
-                                      canopywater_state%Evap/(time_step*3600.0)
+          ! call SpaFHy code to compute new canopywater_state and snowwater_state
+          ! returns water fluxes integrated over time_step in units [mm = kg H2O m-2]
+          call initialization_spafhy_flux(canopywater_flux, soilwater_flux)
 
+          call canopy_water_flux(rn, temp-273.15, prec, vpd, wind, pres, fapar, lai, &
+                                  canopywater_state, canopywater_flux, soilwater_state, spafhy_para)
+
+          ! ET [mm]
+          canopywater_flux%ET =  tr_phydro * (time_step*3600.0) +  canopywater_flux%GroundEvap + &
+                                      canopywater_flux%CanopyEvap
+          
+          LatentHeat = 1.0e3 * (3147.5 - 2.37 * (temp))
+          LE = canopywater_flux%ET / (time_step * 3600.0) * LatentHeat ! Wm-2
+
+          ! Solve soil water balance
+
+          tr_spafhy=tr_phydro*(time_step*3600.0*1.0e-3)   ! This variable has to be used to be modified in soil_water
           retflow=0.0
-          tr_spafhy=tr_phydro*(time_step*3600.0*1.0e-3)
-          call soil_water(soilwater_state, snowwater_state%PotInf*1.0e-3, &
+          ! water fluxes must be in units [m]. Updates soilwater_state, including soilwater_state%Psi.
+          call soil_water(soilwater_state, soilwater_flux, canopywater_flux%PotInf*1.0e-3, &
                           tr_spafhy,  &
-                          canopywater_state%Efloor*(time_step*3600.0*1.0e-3), retflow)  
+                          canopywater_flux%GroundEvap*1.0e-3, retflow, spafhy_para)  
 
-          call soil_water_retention_curve(soilwater_state%Wliq, psi_soil_spafhy) 
+          !call soil_water_retention_curve(soilwater_state%Wliq, psi_soil_spafhy) 
 
         !end if  !phenology
         
         ! Calculation of NEE & LATENT heat flux
         ! nee= gpp-ar-hr
-        ! et = tr+evap_can(temp, rad)+evap_soil(temp, rad)
 
         ! Write hourly output at output time step frequency
+
+        ! *** test output for de-bugging
+        write(99,'(*(G0.6,:,","))') & 
+        prec, temp - 273.15, soilwater_state%Wliq, soilwater_state%Wliq_top, &
+        soilwater_state%Psi, soilwater_flux%mbe, tr_spafhy, &
+        canopywater_flux%GroundEvap*1.0e-3, soilwater_flux%Inflow, soilwater_flux%Drain, soilwater_flux%Roff, &
+        soilwater_state%PondSto, canopywater_state%swe, canopywater_state%SWEl, canopywater_state%SWEi, &
+        canopywater_flux%CanopyEvap*1e-3, &
+        canopywater_flux%MBE, canopywater_state%CanopyStorage, canopywater_flux%Trfall, canopywater_flux%PotInf, &
+        LE, tr_phydro, gs, soilwater_state%WatSto, soilwater_state%WatStoTop
 
         if ( mod(tot_hour,time_step_output) .eq. 0.0 ) then
             
@@ -301,31 +343,51 @@ program SVMC
             call netCDF_prepareOUTPUT(output_filename_hr, lon_sites, lat_sites, ntim_out_hr)
           end if
 
-          gpp_matrix(1,1,1)   =gpp
-          gs_matrix(1,1,1)    =gs
-          jmax_matrix(1,1,1)  =jmax
-          vcmax_matrix(1,1,1) =vcmax
-          chi_matrix(1,1,1)   =chi
-          dpsi_matrix(1,1,1)  =dpsi
-          profit_matrix(1,1,1)=profit
-          soilmoist1_matrix(1,1,1)=soilwater_state%Wliq
-          psi_soil_matrix(1,1,1)=psi_soil_spafhy
-          evap_matrix(1,1,1)=canopywater_state%ET
           print *, "step_nc_hr=", step_nc_hr
 
-          call netCDF_writeOUTPUT(output_filename_hr, "GPP", gpp_matrix, tot_hour/24.0, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "stomatal_conductance", gs_matrix, tot_hour/24.0, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "Jmax", jmax_matrix, tot_hour/24.0, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "Vcmax", vcmax_matrix, tot_hour/24.0, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "Chi", chi_matrix, tot_hour/24.0, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "Dpsi", dpsi_matrix, tot_hour/24.0, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "Profit", profit_matrix, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "GPP", gpp, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "stomatal_conductance", gs, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "Jmax", jmax, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "Vcmax", vcmax, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "Chi", chi, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "Dpsi", dpsi, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "Profit", profit, tot_hour/24.0, step_nc_hr)
 
-          call netCDF_writeOUTPUT(output_filename_hr, "Evap", evap_matrix, tot_hour/24.0, step_nc_hr)
-          !call netCDF_writeOUTPUT(output_filename_hr, "Transp", tr, tot_hour/24, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "SoilMoist", soilmoist1_matrix, tot_hour/24.0, step_nc_hr)
-          print *, "psi=", psi_soil_matrix, soilmoist1_matrix
-          call netCDF_writeOUTPUT(output_filename_hr, "SoilMoistPot", psi_soil_matrix, tot_hour/24.0, step_nc_hr)
+          !Use common unit [mm s-1] ≈ [kg H2O m-2 s-1] for flux
+          call netCDF_writeOUTPUT(output_filename_hr, "Evap", canopywater_flux%ET/(time_step*3600.0), & 
+                                      tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "Transp", tr_spafhy*1e3/(time_step*3600.0), &
+                                      tot_hour/24, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "CanopyEvap", canopywater_flux%CanopyEvap/(time_step*3600.0), &
+                                      tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "GroundEvap", canopywater_flux%GroundEvap/(time_step*3600.0), & 
+                                      tot_hour/24, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "Trfall", canopywater_flux%Trfall/(time_step*3600.0), &
+                                      tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "CanopyInterc", canopywater_flux%Interc/(time_step*3600.0), &
+                                      tot_hour/24, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "PotInf", canopywater_flux%PotInf/(time_step*3600.0), & 
+                                      tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "Unload", canopywater_flux%Unload/(time_step*3600.0), & 
+                                      tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "Roff", soilwater_flux%Roff*1e3/(time_step*3600.0), & 
+                                      tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "Drain", soilwater_flux%Drain*1e3/(time_step*3600.0), & 
+                                      tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "Inflow", soilwater_flux%Inflow*1e3/(time_step*3600.0), & 
+                                      tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "TopSoilInterc", soilwater_flux%Interc*1e3/(time_step*3600.0), & 
+                                      tot_hour/24.0, step_nc_hr)                    
+         
+          !Use the units used by original spafhy: [m] for soil water storage, [mm] for canopy water storage
+          call netCDF_writeOUTPUT(output_filename_hr, "WatSto", soilwater_state%WatSto, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "PondSto", soilwater_state%PondSto, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "WatStoTop", soilwater_state%WatSto, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "SoilMoist", soilwater_state%Wliq, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "SoilMoistPot", soilwater_state%Psi, tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "CanopyStorage", canopywater_state%CanopyStorage, &
+                                      tot_hour/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "swe", canopywater_state%swe, tot_hour/24.0, step_nc_hr)
           
           step_nc_hr= step_nc_hr+1 
         endif

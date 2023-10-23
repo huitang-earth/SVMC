@@ -1,11 +1,11 @@
-SHELL = /bin/bash
+SHELL = /usr/bin/bash
 MAIN = SVMC
 
 FC       = gfortran
 #INCPATH  = /xnilu_wrk/flex_wrk/bin64/grib_api/include
 #INCPATH1 = /usr/include
 #INCPATH_NCDF =  /homevip/flexpart/gcc-5.4.0/include
-INCPATH1 = /usr/local/include
+INCPATH1 = /appl/spack/v018/install-tree/gcc-11.3.0/netcdf-fortran-4.5.4-p6xyan/include
 #/usr/include
 
 #LIBPATH1 = /xnilu_wrk/flex_wrk/bin64/grib_api/lib/
@@ -13,11 +13,11 @@ INCPATH1 = /usr/local/include
 #/usr/lib/x86_64-linux-gnu/ 
 #/homevip/flexpart/gcc-5.4.0/lib
 #LIBPATH2 =   /usr/lib/x86_64-linux-gnu/
-LIBPATH1 = /usr/local/lib
+LIBPATH1 = /appl/spack/v018/install-tree/gcc-11.3.0/netcdf-fortran-4.5.4-p6xyan/lib
 
 LIBS = -lnetcdff -DUSE_NCF
 
-FFLAGS   = -I$(INCPATH1) -O2 -g -cpp -m64 -lnetcdff -lnetcdf -L$(LIBPATH1) -DUSE_NCF -fcheck='all' 
+FFLAGS   = -I$(INCPATH1) -O2 -g -cpp -m64 -lnetcdff -L$(LIBPATH1) -DUSE_NCF -fcheck='all' 
 #FFLAGS   =   -I$(INCPATH1) -I$(INCPATH_NCDF) -g  -fbacktrace -mcmodel=medium -fbounds-check -Wall -Wextra -Warray-temporaries -Wconversion -fimplicit-none -fbacktrace -ffree-line-length-0 -fcheck=all -ffpe-trap=zero,overflow,underflow -finit-real=nan
 LDFLAGS  = $(FFLAGS)  -L$(LIBPATH1) $(LIBS)  #-Wl,-rpath,$(LIBPATH1) $(LIBPATH2) $(LIBS) 
 #LDFLAGS  = $(FFLAGS)  -L$(LIBPATH1) -lgrib_api_f90 -lgrib_api -lm -ljasper -lnetcdff
