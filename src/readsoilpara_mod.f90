@@ -2,55 +2,63 @@ MODULE readsoilpara_mod
 
 implicit none
   type, public :: soilwater_state_type
-    real(8)  :: PondSto ! [m] - pond storage
-    real(8)  :: WatSto  ! [m] - root zone storage
+    real(8)  :: WatSto  ! [mm] - root zone storage
     real(8)  :: MaxWatSto ! [m] - root zone storage capacity
-    real(8)  :: WatStoTop ! [m] - top layer storage
-    real(8)  :: MaxStoTop ! [m] - top layer storage capacity
+    real(8)  :: PondSto ! [mm] - pond storage
+    real(8)  :: MaxPondSto ! [mm] - pond storage capacity
+    real(8)  :: FcSto ! [mm] - root zone storage at field capacity
+    !real(8)  :: WatStoTop ! [m] - top layer storage
+    !real(8)  :: MaxStoTop ! [m] - top layer storage capacity
     real(8)  :: Wliq      ! [m3 m-3] - root zone water content
-    real(8)  :: Wliq_top  ! [m3 m-3] - top layer water content
+    !real(8)  :: Wliq_top  ! [m3 m-3] - top layer water content
     real(8)  :: Psi  ! water potential, root zone (MPa)
-    real(8)  :: PsiTop  ! water potential, organic top layer (MPa)
+    !real(8)  :: PsiTop  ! water potential, organic top layer (MPa)
     real(8)  :: Sat   ! saturation ratio (-), root zone
     real(8)  :: Kh   ! Hydraulic conductivity at Sat [m s-1]
     real(8)  :: beta    ! modifier for soil evaporation rate, WliqTop/FCtop
+    !real(8)  :: mbe     ! [m] - mass balance error
   end type soilwater_state_type
 
   type, public :: soilwater_flux_type
-    real(8)  :: Inflow  ! [m] - total inflow to root zone during timestep
-    real(8)  :: Roff    ! [m] - surface runoff -"-
-    real(8)  :: Drain   ! [m] - drainage from root zone -"-
-    real(8)  :: Interc  ! [m] - interception of top layer -"-
-    real(8)  :: mbe     ! [m] - mass balance error
+    real(8)  :: Infiltration  ! [mm] - total inflow to root zone during timestep
+    real(8)  :: Runoff    ! [mm] - surface runoff -"-
+    real(8)  :: Drainage  ! [mm] - drainage from bucket
+    real(8)  :: LateralFlow ! [mm] - lateral flow to ditch
+    real(8)  :: ET        ! [mm] - evapotranspiration from bucket
+    real(8)  :: mbe       ! [mm] - mass balance error
+    !real(8)  :: Interc  ! [m] - interception of top layer -"-
   end type soilwater_flux_type
 
   type, public :: canopywater_state_type
     real(8) :: CanopyStorage ! canopy water storage (mm = kg m-2(ground)) 
-    real(8) :: swe        ! [mm] snow water equivalent
-    real(8) :: SWEi      ! [mm] snow water equivalent as ice
-    real(8) :: SWEl     ! [mm] snow water equivalent as liquid 
+    real(8) :: SWE        ! [mm] snow water equivalent
+    real(8) :: swe_i      ! [mm] snow water equivalent as ice
+    real(8) :: swe_l     ! [mm] snow water equivalent as liquid
+    !real(8) :: MBE       ! mass balance error (mm)      
   end type canopywater_state_type
 
   type, public :: canopywater_flux_type
-    real(8) :: Trfall     ! throughfall to snow / soil surface (mm, during timestep)
-    real(8) :: Interc     ! interception of canopy (mm)
+    real(8) :: Throughfall     ! throughfall to snow / soil surface (mm, during timestep)
+    real(8) :: Interception     ! interception of canopy (mm)
     real(8) :: CanopyEvap ! evaporation / sublimation from canopy store (mm)
-    real(8) :: Unload     ! undloading from canopy storage (mm)    
-    real(8) :: GroundEvap ! evaporation from ground (mm)   
+    real(8) :: Unloading  ! undloading from canopy storage (mm)    
+    real(8) :: SoilEvap   ! evaporation from ground (mm)   
     real(8) :: ET         ! total evapo-transpiration (mm)
-    real(8) :: Transpi    ! transpiration rate (mm ≈ kg H2O m-2 s-1)  Hui: This is not used currently.....
-    real(8) :: PotInf     ! potential infiltration to soil profile (mm)    
-    real(8) :: MBE       ! mass balance error (mm)     
+    real(8) :: Transpiration    ! transpiration rate (mm)  
+    real(8) :: PotInfiltration  ! potential infiltration to soil profile (mm)
+    real(8) :: Melt   ! snow melt (mm)
+    real(8) :: Freeze ! snow liquid water refreeze (mm)
+    real(8) :: mbe      ! mass-balance error [mm]  
   end type canopywater_flux_type
 
 ! Hydraulic properties (organic layer & soil) for spafhy
   type, public :: spafhy_para_type
     ! soil related parameters
-    real(8) :: soil_depth    ! root zone depth (m)
+    real(8) :: maxpond        ! max ponding storage [mm]
+    real(8) :: soil_depth    ! root zone depth [m]
     real(8) :: max_poros     ! [m3 m-3], porosity
     real(8) :: fc            ! [m3 m-3], field capacity. For consistency, must be computed from soil water retention curve at Psi= xx KPa
     real(8) :: wp            ! [m3 m-3], wilting point. For consistency, must be computed from soil water retention curve at Psi=xx KPa
-    real(8) :: ksat          ! [m s-1], saturated hyd, conductivity
  
     ! soil retention curve (Van Genuchten) parameters
     !--- parameters from Launiainen et al. Forests, 2022  
@@ -58,15 +66,14 @@ implicit none
     real(8) :: watres      !Launiainen et al. 2022: C1-5: 0.0
     real(8) :: alpha_van   !Launiainen et al. 2022: C1-5: 4.45, 5.92, 2.02, 4.49, 3.35
     real(8) :: watsat      !Launiainen et al. 2022: C1-5: 0.75, 0.68, 0.46, 0.47, 0.54  
+    real(8) :: ksat          ! [mm s-1], saturated hyd, conductivity
 
-  
     ! organic (moss) layer
-    real(8) :: org_depth     ! depth of organic top layer (m)
-    real(8) :: org_poros      ! porosity (-), redundent.
-    real(8) :: org_fc         ! field capacity (-)
-    real(8) :: org_sat        ! organic top layer saturation ratio (-)
+    !real(8) :: org_depth     ! depth of organic top layer (m)
+    !real(8) :: org_poros      ! porosity (-), redundent.
+    !real(8) :: org_fc         ! field capacity (-)
+    !real(8) :: org_sat        ! organic top layer saturation ratio (-)
     !real(8) :: org_rw        ! critical vol. moisture content (-) for decreasing phase in Ef
-    real(8) :: maxpond        ! max ponding allowed (m)
    
     ! Canopy water parameters
     real(8) :: wmax     ! storage capacity for rain (mm/LAI), Hui: this is too much compared to CTSM
@@ -81,7 +88,7 @@ implicit none
     ! degree-day snow model
     real(8) :: kmelt         ! melt coefficient in open (mm/s)
     real(8) :: kfreeze       ! freezing coefficient (mm/s)
-    real(8) :: frac_snowliq              ! r, maximum fraction of liquid in snow (-)
+    real(8) :: frac_snowliq  ! r, maximum fraction of liquid in snow (-)
 
     ! flow field
     real(8) :: zmeas    
@@ -213,7 +220,7 @@ contains
     org_poros=0.9
     org_fc=0.3        
     !org_rw=0.24       
-    maxpond=0.0
+    maxpond=0.0  ! mm
     !rootzone_sat= 0.6 
     org_sat     = 1.0
     !pond_sto    = 0.0
@@ -232,14 +239,14 @@ contains
     rw =0.20          ! critical value for REW (-),
     rwmin=0.02        ! minimum relative conductance (-)
     ! soil evaporation
-    gsoil=1e-2              ! soil surface conductance if soil is fully wet (m/s)
+    gsoil=5e-3              ! soil conductance if soil is fully wet (m/s) !
     ! degree-day snow model
     kmelt   = 2.8934e-05    ! melt coefficient in open (mm/s)
     kfreeze = 5.79e-6       ! freezing coefficient (mm/s)
     frac_snowliq = 0.05          ! maximum fraction of liquid in snow (-)
     ! flow field
     zmeas     = 2.0
-    zground   = 0.5
+    zground   = 0.1
     zo_ground = 0.01 
 
   ! Reading namelist
@@ -256,10 +263,10 @@ contains
      spafhy_para%fc=fc
      spafhy_para%wp=wp
      spafhy_para%ksat=ksat
-     spafhy_para%org_depth=org_depth
-     spafhy_para%org_poros=org_poros
-     spafhy_para%org_fc=org_fc
-     spafhy_para%org_sat=org_sat
+     !spafhy_para%org_depth=org_depth
+     !spafhy_para%org_poros=org_poros
+     !spafhy_para%org_fc=org_fc
+     !spafhy_para%org_sat=org_sat
      spafhy_para%maxpond=maxpond
      spafhy_para%n_van=n_van
      spafhy_para%watres=watres

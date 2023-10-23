@@ -34,7 +34,7 @@ blas.o   \
 linpack.o \
 lbfgsb.o \
 phydro_mod.o \
-spafhy_mod.o \
+water_mod.o \
 juldate.o
 
 OBJECTS = \

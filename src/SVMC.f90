@@ -25,7 +25,9 @@ program SVMC
   use io_mod                    ! manage input/output of the model
 
   use phydro_mod                ! module for p-hydro
-  use spafhy_mod                ! module for soil water bucket model, which will provide psi_soil for p-hydro
+  use water_mod                 ! module for canopy and soil water budget
+  !use spafhy_mod                ! module for soil water bucket model, which will provide psi_soil for p-hydro
+  
   !use alloc_mod                ! module for carbon allocation and yield
  ! use yasso                     ! module for soil decomposition model, which will provide heterogeneous respiration (hr)   
 
@@ -89,7 +91,7 @@ program SVMC
 
   ! spafhy variables
   real(8)    :: tr_spafhy   ! Transpiration estimated by spafhy model
-  real(8)    :: retflow     ! return flow from ground water [m]
+  real(8)    :: latflow     ! lateral flow to ditches (placeholder) [m]
   real(8)    :: LE          ! latent heat flux [Wm-2]
   real(8)    :: LatentHeat  ! latent heat of vaporization [J kg-1]
 
@@ -172,9 +174,12 @@ program SVMC
 
   !********* open file for writing SpaFHy test outputs
   open(99, file = 'logbook.txt', status = 'old')
-  write(99,*) "prec,T,Wliq,WliqTop,PsiS,Mbe,tr,ground_evap,infil,drain,roff,pondsto,swe,&
-      &swe_l,swe_i,canopy_evap,canopy_mbe,CanopyStorage,Trfall,PotInf, LE, tr_phydro, gs, WatSto, WatStoTop"
-  
+  !write(99,*) "prec,T,Wliq,WliqTop,PsiS,Mbe,tr,ground_evap,infil,drain,roff,pondsto,swe,&
+  !    &swe_l,swe_i,canopy_evap,canopy_mbe,CanopyStorage,Trfall,PotInf, LE, tr_phydro, gs, WatSto, WatStoTop"
+  write(99, *) "prec,T,Wliq,PsiS,soil_mbe,soil_ET,soil_Infiltration,soil_Drainage,soil_Runoff,soil_PondSto,&
+                &canopy_SWE,canopy_swe_l,canopy_swe_i,canopy_CanopyEvap,canopy_SoilEvap,tr_spafhy,&
+                &canopy_Interception,canopy_Throughfall,canopy_PotInfiltration,canopy_mbe,canopy_CanopyStorage,&
+                &LE,tr_phydro,gs,soil_Kh,Melt,Freeze,beta_SoilEvap,canopy_Unloading"
   !*******************
   
   ! Loop over time, and locations
@@ -207,7 +212,7 @@ program SVMC
             if (obs_soilmoist) then
               call netCDF_readsoilmoist('../data/FieldObs_Qvidja.2021.soilmoist.nc', soilmoist_matrix, step_soilmoist)
               soilmoist=soilmoist_matrix(1,1,1)               
-              call soil_water_retention_curve(soilmoist, psi_soil)
+              call soil_water_retention_curve(soilmoist, spafhy_para, psi_soil)
               step_soilmoist=step_soilmoist+1
             end if
 
@@ -240,8 +245,9 @@ program SVMC
           rdark=0.0
           if(.not. obs_soilmoist) then
             !psi_soil = -1.0
-             psi_soil = soilwater_state%Psi !root zone, MPa
-            !psi_soil = min(-eps, max(psi_soil, -2.0))  ! ensures psi_soil <0 and >-2.0 MPa
+            psi_soil = soilwater_state%Psi !root zone, MPa
+            !psi_soil = min(-eps, max(psi_soil, -3.0))  ! ensures psi_soil <0 and >-3.0 MPa
+
           end if
 
           print *, "temp =", temp-273.15                  ! unit should be C
@@ -285,34 +291,36 @@ program SVMC
           ! net radiation of the whole canopy-soil system [W m-2]
           ! Samuli will revise later!
           rn= rg * 0.7
-          !rn = max(2.57*lai/(2.57*lai+0.57)-0.2, 0.55)*rg  ! Launiainen et al. 2016 GCB, fit to Fig 2a
-
-          !call canopy_water_flux(gs, rn, temp-273.15, prec, ppfd, vpd,  &
-          !                        wind, co2*1000000, soilwater_state%Rew, & 
-          !                        pres, lai, canopywater_state, snowwater_state)       
+          !rn = max(2.57*lai/(2.57*lai+0.57)-0.2, 0.55)*rg  ! Launiainen et al. 2016 GCB, fit to Fig 2a     
           
+          ! reset water fluxes to zero
+          call reset_spafhy_flux(canopywater_flux, soilwater_flux)
+
           ! call SpaFHy code to compute new canopywater_state and snowwater_state
           ! returns water fluxes integrated over time_step in units [mm = kg H2O m-2]
-          call initialization_spafhy_flux(canopywater_flux, soilwater_flux)
-
           call canopy_water_flux(rn, temp-273.15, prec, vpd, wind, pres, fapar, lai, &
                                   canopywater_state, canopywater_flux, soilwater_state, spafhy_para)
 
           ! ET [mm]
-          canopywater_flux%ET =  tr_phydro * (time_step*3600.0) +  canopywater_flux%GroundEvap + &
+          canopywater_flux%ET =  tr_phydro * (time_step*3600.0) +  canopywater_flux%SoilEvap + &
                                       canopywater_flux%CanopyEvap
           
           LatentHeat = 1.0e3 * (3147.5 - 2.37 * (temp))
           LE = canopywater_flux%ET / (time_step * 3600.0) * LatentHeat ! Wm-2
 
           ! Solve soil water balance
-
-          tr_spafhy=tr_phydro*(time_step*3600.0*1.0e-3)   ! This variable has to be used to be modified in soil_water
-          retflow=0.0
+          tr_spafhy = tr_phydro*(time_step*3600.0) ! mm
+          latflow=0.0
           ! water fluxes must be in units [m]. Updates soilwater_state, including soilwater_state%Psi.
-          call soil_water(soilwater_state, soilwater_flux, canopywater_flux%PotInf*1.0e-3, &
-                          tr_spafhy,  &
-                          canopywater_flux%GroundEvap*1.0e-3, retflow, spafhy_para)  
+          call soil_water(soilwater_state, soilwater_flux, spafhy_para, canopywater_flux%PotInfiltration, &
+                          tr_spafhy, canopywater_flux%SoilEvap, latflow)
+
+          !tr_spafhy=tr_phydro*(time_step*3600.0*1.0e-3)   ! This variable has to be used to be modified in soil_water
+          !retflow=0.0
+          ! water fluxes must be in units [m]. Updates soilwater_state, including soilwater_state%Psi.
+          !call soil_water(soilwater_state, soilwater_flux, canopywater_flux%PotInf*1.0e-3, &
+          !                tr_spafhy,  &
+          !                canopywater_flux%GroundEvap*1.0e-3, retflow, spafhy_para)  
 
           !call soil_water_retention_curve(soilwater_state%Wliq, psi_soil_spafhy) 
 
@@ -322,16 +330,24 @@ program SVMC
         ! nee= gpp-ar-hr
 
         ! Write hourly output at output time step frequency
+        write(99,'(*(G0.6,:,","))') & 
+        prec*time_step, temp - 273.15, soilwater_state%Wliq, soilwater_state%Psi, soilwater_flux%mbe, &
+        soilwater_flux%ET, soilwater_flux%Infiltration, soilwater_flux%Drainage, soilwater_flux%Runoff, &
+        soilwater_state%PondSto, canopywater_state%SWE, canopywater_state%swe_l, canopywater_state%swe_i, &
+        canopywater_flux%CanopyEvap, canopywater_flux%SoilEvap, tr_spafhy, canopywater_flux%Interception, &
+        canopywater_flux%Throughfall, canopywater_flux%PotInfiltration, canopywater_flux%mbe, & 
+        canopywater_state%CanopyStorage, LE, tr_phydro, gs, soilwater_state%Kh, canopywater_flux%Melt, canopywater_flux%Freeze, &
+        soilwater_state%beta,canopywater_flux%Unloading
 
         ! *** test output for de-bugging
-        write(99,'(*(G0.6,:,","))') & 
-        prec, temp - 273.15, soilwater_state%Wliq, soilwater_state%Wliq_top, &
-        soilwater_state%Psi, soilwater_flux%mbe, tr_spafhy, &
-        canopywater_flux%GroundEvap*1.0e-3, soilwater_flux%Inflow, soilwater_flux%Drain, soilwater_flux%Roff, &
-        soilwater_state%PondSto, canopywater_state%swe, canopywater_state%SWEl, canopywater_state%SWEi, &
-        canopywater_flux%CanopyEvap*1e-3, &
-        canopywater_flux%MBE, canopywater_state%CanopyStorage, canopywater_flux%Trfall, canopywater_flux%PotInf, &
-        LE, tr_phydro, gs, soilwater_state%WatSto, soilwater_state%WatStoTop
+        !write(99,'(*(G0.6,:,","))') & 
+        !prec, temp - 273.15, soilwater_state%Wliq, soilwater_state%Wliq_top, &
+        !soilwater_state%Psi, soilwater_state%mbe, tr_spafhy, &
+        !canopywater_flux%GroundEvap*1.0e-3, soilwater_flux%Inflow, soilwater_flux%Drain, soilwater_flux%Roff, &
+        !soilwater_state%PondSto, canopywater_state%swe, canopywater_state%SWEl, canopywater_state%SWEi, &
+        !canopywater_flux%CanopyEvap*1e-3, &
+        !canopywater_state%MBE, canopywater_state%CanopyStorage, canopywater_flux%Trfall, canopywater_flux%PotInf, &
+        !LE, tr_phydro, gs, soilwater_state%WatSto, soilwater_state%WatStoTop
 
         if ( mod(tot_hour,time_step_output) .eq. 0.0 ) then
             
