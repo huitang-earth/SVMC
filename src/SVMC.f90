@@ -41,7 +41,7 @@ program SVMC
   real(8), dimension(1)     :: start_clim_time, end_clim_time
   real(8)            :: start_clim_juldate,start_lai_juldate    
   real(8), dimension(1)    :: start_lai_time, end_lai_time 
-  integer         :: ntim_clim, ntim_lai, ntim_out_hr, ntim_out_day, met1_ind, met2_ind
+  integer         :: ntim_clim, ntim_lai, ntim_out_hr, ntim_out_day
  
   !***********************************
   !Model variables
@@ -49,13 +49,13 @@ program SVMC
 
   ! p-hydro variabless
   ! Input variables for p-hydro (the definition is from rpmodel.R)
-  real(8)     ::    temp, temp_roll, temp_day, temp_state(24*30+1)        ! Air temperature (tc), K
+  real(8)     ::    temp, temp_day         ! Air temperature (tc), K
   real(8)     ::    ppfd      ! Photosynthetic photon flux density (mol m-2 d-1) (incoming solar radiation from forcing data?)
   real(8)     ::    vpd       ! Vapour pressure deficit (Pa) (will be calculated using pressure & humidity)
   real(8)     ::    co2       ! Atmospheric CO2 concentration (ppm)
   real(8)     ::    elv       ! Elevation above sea-level (m.a.s.l.) (not needed if we have surface pressure!)
   real(8)     ::    fapar     ! Fraction of absorbed photosynthetically active radiation (unitless) (will be calculated using LAI)
-  real(8)     ::    prec, precip_roll, precip_day, prec_state(24*30+1)      ! 
+  real(8)     ::    prec, precip_day       ! 
   real(8)     ::    pres
   real(8)     ::    sh
   real(8)     ::    rh
@@ -95,7 +95,10 @@ program SVMC
   
   ! yasso variables
   real(8)    :: HeteroResp, AutoResp,TotalResp
-  real    :: leaf_litter_c, root_litter_c, soluble=0.0, compost=0.0
+  real(8)    :: leaf_litter_c, root_litter_c, soluble=0.0, compost=0.0
+  real(8)    :: metyasso_roll(2), metyasso(2)
+  real(8)    :: metyasso_state(2,24*30+1)
+  integer    :: metyasso_ind
 
   ! alloc variables
   real(8)    :: croot=0.0, cleaf=0.0, cstem=0.0
@@ -113,7 +116,7 @@ program SVMC
 
   type(soilwater_type)          :: soilwater_state  
   type(canopywater_type)        :: canopywater_state
-  type(snowwater_type)        :: snowwater_state
+  type(snowwater_type)          :: snowwater_state
   
   type(soilcn_state_type)       :: soilcn_state
   type(soilcn_flux_type)        :: soilcn_flux
@@ -170,8 +173,7 @@ program SVMC
   tot_hour=0.0
   step_nc_hr=0
   step_nc_day=0
-  met1_ind=1
-  met2_ind=1
+  metyasso_ind=1
   temp_day=0.0
   precip_day=0.0
   gpp_day=0.0
@@ -386,14 +388,17 @@ program SVMC
         ! Yasso: create average meteorological forcings for yasso
         ! HT: Currently, we use monthly rolling average for each hour calculation
         ! JV: compare annual balance with daily calculation
-        call average_met(temp-273.15, temp_roll, 24*30, temp_state, met1_ind)
-        call average_met(prec, precip_roll, 24*30, prec_state, met2_ind)
+        metyasso(1)=temp-273.15
+        metyasso(2)=prec
+      
+        call average_met(metyasso, metyasso_roll, 24*30, &
+                                    metyasoo_state, metyasso_ind)
         
-        temp_day=temp_day+temp_roll
-        precip_day=precip_day+precip_roll*time_step*3600
+        temp_day=temp_day+metyasso_roll(1)
+        precip_day=precip_day+metyasso_roll(2)*time_step*3600
 
         write(99,'(*(G0.6,:,","))') & 
-          temp, prec, temp_roll, precip_roll
+          metyasso(1), metyasso(2), metyasso_roll(1), metyasso_roll(2)
 
         if (ISNAN(gpp) .or. (gpp .lt. 0.0)) then
           gpp = 0.0
@@ -454,7 +459,7 @@ program SVMC
              soilcn_flux%input_cfract(3), soilcn_flux%input_cfract(4), soilcn_flux%input_cfract(5), &
              soilcn_flux%input_nfract, soilcn_flux%ctend(1), soilcn_flux%ctend(2), &
              soilcn_flux%ctend(3), soilcn_flux%ctend(4), soilcn_flux%ctend(5), soilcn_flux%ntend, & 
-             leaf_litter_c, root_litter_c, real(temp_roll), real(precip_roll)
+             leaf_litter_c, root_litter_c, metyasso_roll(1),metyasso_roll(2)
 
           call wrapper_yasso_initialize_flux(soilcn_flux)
           call inputs_to_fractions(leaf_litter_c, root_litter_c, soluble, compost, soilcn_flux%input_cfract)
@@ -466,7 +471,7 @@ program SVMC
              soilcn_flux%input_nfract, soilcn_flux%ctend(1), soilcn_flux%ctend(2), &
              soilcn_flux%ctend(3), soilcn_flux%ctend(4), soilcn_flux%ctend(5), soilcn_flux%ntend
 
-          call wrapper_yasso_decompose(soilcn_state, soilcn_flux, yasso_para, 1.0, real(temp_day), real(precip_day))
+          call wrapper_yasso_decompose(soilcn_state, soilcn_flux, yasso_para, 1.0, temp_day, precip_day)
 
           write(99,'(*(G0.6,:,","))') & 
              soilcn_state%cstate(1), soilcn_state%cstate(2), soilcn_state%cstate(3), soilcn_state%cstate(4), & 
