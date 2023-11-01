@@ -458,32 +458,32 @@ contains
   subroutine average_met(met_daily, met_rolling, aver_size, met_state, met_ind)
     ! Evaluate a rolling window average for given met quantities. Used for scaling met
     ! parameters from daily to monthly level.
-    real(8), intent(in) :: met_daily
-    real(8), intent(out) :: met_rolling
+    real, intent(in) :: met_daily(:)
+    real, intent(out) :: met_rolling(:)
     integer, intent(in) :: aver_size ! number of days to average over, must not change
-    real(8), intent(inout) :: met_state(:) ! size(met_daily), aver_size + 1
+    real, intent(inout) :: met_state(:,:) ! size(met_daily), aver_size + 1
     integer, intent(inout) :: met_ind     ! a counter, must be 1 on first call, not changed outside
 
     if (met_ind < 1 .or. met_ind > aver_size+1) then
        print *, 'something wrong with met_ind: ', met_ind
        error stop
     end if
-    if (size(met_state, 1) /= aver_size + 1 ) then
+    if (size(met_state, 2) /= aver_size + 1 .or. size(met_state, 1) /= size(met_rolling)) then
        print *, 'met_state has wrong size', shape(met_state)
        error stop
     end if
     
     if (met_ind <= aver_size) then
        ! For the first aver_size days average as many values as have been input.
-       met_state(met_ind) = met_daily
+       met_state(:,met_ind) = met_daily
        met_ind = met_ind + 1
     else
        ! met_ind now stays as aver_size+1
-       met_state(aver_size+1) = met_daily
-       met_state(1:aver_size) = met_state(2:aver_size+1)
+       met_state(:,aver_size+1) = met_daily
+       met_state(:,1:aver_size) = met_state(:,2:aver_size+1)
     end if
 
-    met_rolling = sum(met_state(1:met_ind-1), dim=1) / (met_ind-1)
+    met_rolling = sum(met_state(:,1:met_ind-1), dim=2) / (met_ind-1)
     
   end subroutine average_met
   
