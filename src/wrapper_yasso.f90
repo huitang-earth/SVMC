@@ -69,6 +69,7 @@ public wrapper_yasso_initialize
 public wrapper_yasso_initialize_totc
 public wrapper_yasso_initialize_flux
 public wrapper_yasso_decompose
+public exponential_smooth_met
 
 contains
 
@@ -158,7 +159,7 @@ subroutine readsoilyasso_namelist(yasso_para)
 
   end subroutine readsoilyasso_namelist
 
-  
+
   subroutine wrapper_yasso_initialize(soilcn_state, yasso_para)
    
     ! A simple algorithm to initialize the SOC pools into a steady state or a partial
@@ -238,6 +239,31 @@ subroutine readsoilyasso_namelist(yasso_para)
     soilcn_state%nstate=soilcn_state%nstate + soilcn_flux%ntend + soilcn_flux%input_nfract
 
   end subroutine wrapper_yasso_decompose
+
+  subroutine exponential_smooth_met(met_daily, met_rolling, met_ind)
+    ! Evaluate an expotential smoothing. used for scaling met
+    ! parameters from daily to monthly level.
+    real, intent(in) :: met_daily(:)
+    real, intent(out) :: met_rolling(:)
+    integer, intent(inout) :: met_ind     ! a counter, must be 1 on first call, not changed outside
+    ! local variables
+    real           :: alpha_smooth=0.002
+
+    if (met_ind < 1 ) then
+       print *, 'something wrong with met_ind: ', met_ind
+       error stop
+    end if
+    
+    if (met_ind == 1) then
+       ! For the first aver_size days average as many values as have been input.
+       met_rolling(:) = met_daily(:)
+       met_ind = met_ind + 1
+    else
+       ! met_ind now stays as aver_size+1
+       met_rolling(:) = alpha_smooth * met_daily(:) + (1-alpha_smooth) * met_rolling(:)
+    end if
+
+  end subroutine exponential_smooth_met
 
   
 end module wrapper_yasso

@@ -391,8 +391,12 @@ program SVMC
         metyasso(1)=temp-273.15
         metyasso(2)=prec
       
-        call average_met(metyasso, metyasso_roll, 24*30, &
-                                    metyasoo_state, metyasso_ind)
+        ! 30-day moving averaging 
+        !call average_met(metyasso, metyasso_roll, 24*30, &
+        !                           metyasoo_state, metyasso_ind)
+
+        ! Exponential smoothing
+        call exponential_smooth_met(metyasso, metyasso_roll, metyasso_ind)                            
         
         temp_day=temp_day+metyasso_roll(1)
         precip_day=precip_day+metyasso_roll(2)*time_step*3600
