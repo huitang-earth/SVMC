@@ -29,7 +29,9 @@ program SVMC
   !use spafhy_mod                ! module for soil water bucket model, which will provide psi_soil for p-hydro
   
   !use alloc_mod                ! module for carbon allocation and yield
- ! use yasso                     ! module for soil decomposition model, which will provide heterogeneous respiration (hr)   
+  use wrapper_yasso             ! module for soil decomposition model, which will provide heterogeneous respiration (hr)   
+  use yasso
+  use allocation 
 
   implicit none
 
@@ -52,13 +54,13 @@ program SVMC
 
   ! p-hydro variabless
   ! Input variables for p-hydro (the definition is from rpmodel.R)
-  real(8)     ::    temp        ! Air temperature (tc), degrees C
+  real(8)     ::    temp, temp_day, temp_year         ! Air temperature (tc), K
   real(8)     ::    ppfd      ! Photosynthetic photon flux density (mol m-2 d-1) (incoming solar radiation from forcing data?)
   real(8)     ::    vpd       ! Vapour pressure deficit (Pa) (will be calculated using pressure & humidity)
   real(8)     ::    co2       ! Atmospheric CO2 concentration (ppm)
   real(8)     ::    elv       ! Elevation above sea-level (m.a.s.l.) (not needed if we have surface pressure!)
   real(8)     ::    fapar     ! Fraction of absorbed photosynthetically active radiation (unitless) (will be calculated using LAI)
-  real(8)     ::    prec      ! 
+  real(8)     ::    prec, precip_day, precip_year       ! 
   real(8)     ::    pres
   real(8)     ::    sh
   real(8)     ::    rh
@@ -71,9 +73,12 @@ program SVMC
   real(8), dimension(1,1,1)  :: lai_matrix, soilmoist_matrix
   real(8), dimension(1,1,1)  :: temp_matrix, ppfd_matrix, rg_matrix, prec_matrix, &
                                 sh_matrix, rh_matrix, vpd_matrix, wind_matrix, &
-                                pres_matrix, co2_matrix
+                                pres_matrix, co2_matrix, gpp_matrix, &
+                                jmax_matrix, vcmax_matrix, dpsi_matrix, &
+                                chi_matrix, profit_matrix, gs_matrix, &
+                                evap_matrix, psi_soil_matrix, soilmoist1_matrix, tmp_matrix
 
-  real(8)     ::    lai
+  real(8)     ::    lai, lai_alloc
 
   real(8)    :: jmax       !  The maximum rate of RuBP regeneration (umol/m2/s) at growth temperature (argument\code{tc}), calculated using
                                                 ! \deqn{A_J = A_C} 
@@ -86,7 +91,7 @@ program SVMC
   real(8)    :: vcmax      !   Carboxylation capacity (umol/m2/s)
   real(8)    :: profit                  ! Net assimilation rate after accounting for costs
   real(8)    :: chi_jmax_lim      ! Analytical chi in the case of strong Jmax limitation
-  real(8)    :: gpp
+  real(8)    :: gpp, gpp_day, npp_day
   real(8)    :: tr_phydro   ! Transpiration estimated by p-hydro model
 
   ! spafhy variables
@@ -94,6 +99,19 @@ program SVMC
   real(8)    :: latflow     ! lateral flow to ditches (placeholder) [m]
   real(8)    :: LE          ! latent heat flux [Wm-2]
   real(8)    :: LatentHeat  ! latent heat of vaporization [J kg-1]
+  
+  ! yasso variables
+  real(8)    :: HeteroResp, AutoResp,TotalResp
+  real(8)    :: leaf_litter_c, root_litter_c, soluble=0.0, compost=0.0
+  real(8)    :: leaf_litter_c_year, root_litter_c_year
+  real(8)    :: metyasso_roll(2), metyasso(2)
+  real(8)    :: metyasso_state(2,24*30+1)
+  integer    :: metyasso_ind
+
+  ! alloc variables
+  real(8)    :: croot=0.0, cleaf=0.0, cstem=0.0
+  real(8)    :: above_biomass, below_biomass, yield
+  integer    :: pheno_stage=1, management_type=0
 
   ! For soil water retention curve
  ! real(8) :: watsat      ! v/v saturate moisture
@@ -109,6 +127,12 @@ program SVMC
   type(canopywater_state_type)        :: canopywater_state
   type(canopywater_flux_type)         :: canopywater_flux
   type(spafhy_para_type)              :: spafhy_para
+  
+  type(soilcn_state_type)       :: soilcn_state, soilcn_state0
+  type(soilcn_flux_type)        :: soilcn_flux
+  type(yasso_para_type)         :: yasso_para
+  type(alloc_para_type)         :: alloc_para
+  type(management_para_type)    :: manage_para
 
   !character(len=200)  ::
   !real,dimension(:,:), allocatable
@@ -126,14 +150,21 @@ program SVMC
   !***********************************
   ! call initialization
    
-  ! psi_soil=0
   call readctrl_namelist
   call readvegpara_namelist
-  call readsoilhydro_namelist(spafhy_para)
 
+  call readsoilhydro_namelist(spafhy_para)
+  call readsoilyasso_namelist(yasso_para)
+  
   !call set_soilwaterState(soilwater_state, canopywater_state)
   call initialization_spafhy(canopywater_state, soilwater_state, spafhy_para)
+  
+  ! initialize yasso model: need temperature & precipitation input
+  call wrapper_yasso_initialize_totc(soilcn_state, yasso_para)
+  soilcn_state0=soilcn_state
 
+  ! call initialize_yasso_totc(param, totc, cn_input, fract_root_input, fract_legacy_soc, &
+  !    tempr_c, precip_day, tempr_ampl, cstate, nstate)
 
   !***********************************
   ! Set time control parameters
@@ -153,6 +184,15 @@ program SVMC
   tot_hour=0.0
   step_nc_hr=0
   step_nc_day=0
+  metyasso_ind=1
+  temp_day=0.0
+  precip_day=0.0
+  gpp_day=0.0
+
+  temp_year=0.0
+  precip_year=0.0
+  root_litter_c_year=0.0
+  leaf_litter_c_year=0.0
 
   print *, tot_hour_end, ntim_out_hr, ntim_out_day
   ! Read time series of input data
@@ -170,8 +210,6 @@ program SVMC
   step_lai  = floor(start_date-start_lai_juldate)+1
   step_soilmoist = floor(start_date-start_soilmoist_juldate)+1
 
-  print *, num_sites, lat_sites, lon_sites, tot_hour, num_pft
-
   !********* open file for writing SpaFHy test outputs
   open(99, file = 'logbook.txt', status = 'old')
   !write(99,*) "prec,T,Wliq,WliqTop,PsiS,Mbe,tr,ground_evap,infil,drain,roff,pondsto,swe,&
@@ -180,6 +218,11 @@ program SVMC
                 &canopy_SWE,canopy_swe_l,canopy_swe_i,canopy_CanopyEvap,canopy_SoilEvap,tr_spafhy,&
                 &canopy_Interception,canopy_Throughfall,canopy_PotInfiltration,canopy_mbe,canopy_CanopyStorage,&
                 &LE,tr_phydro,gs,soil_Kh,Melt,Freeze,beta_SoilEvap,canopy_Unloading"
+                
+  open(999, file = 'yassodebug5.txt', status = 'old')
+  write(999,*) "cstate1,cstate2, cstate3, cstate4, cstate5, nstate, &
+              input_cfract1, input_cfract2, input_cfract3, input_cfract4, input_cfract5, input_nfract, &
+              ctend1, ctend2, ctend3, ctend4, ctend5, ntend"
   !*******************
   
   ! Loop over time, and locations
@@ -288,6 +331,7 @@ program SVMC
           else
              tr_phydro = 1.6*gs*(vpd/pres)*h2o_molmass/density_h2o(temp-273.15, pres) * lai
           end if
+          
           ! net radiation of the whole canopy-soil system [W m-2]
           ! Samuli will revise later!
           rn= rg * 0.7
@@ -416,7 +460,8 @@ program SVMC
         !npp_sum_year=npp_sum_year + npp_hr*3600*...
           
         ! Comulative temperature which will be used for GDD calculation and phenology
-        !temp_day=temp_day+temp_hr
+        !temp_day=temp_day+temp
+        !precip_day=precip_day+prec*time_step*3600
 
         ! Cumulative transpiration and canopy evaporation
         !tr_day=tr_day + tr
@@ -424,12 +469,43 @@ program SVMC
 
         ! Cumulative solar radiation (energy)
 
+        ! Yasso: create average meteorological forcings for yasso
+        ! HT: Currently, we use monthly rolling average for each hour calculation
+        ! JV: compare annual balance with daily calculation
+        metyasso(1)=temp-273.15
+        metyasso(2)=prec
+
+
+      
+        ! 30-day moving averaging 
+        ! call average_met(metyasso, metyasso_roll, 24*30, &
+        !                           metyasso_state, metyasso_ind)
+
+        ! Exponential smoothing
+        call exponential_smooth_met(metyasso, metyasso_roll, metyasso_ind)                            
+        
+        temp_day=temp_day+metyasso_roll(1)
+        precip_day=precip_day+metyasso_roll(2)*time_step*3600
+        
+        temp_year=temp_year + temp-273.15
+        precip_year= precip_year + prec*time_step*3600
+
+
+        write(99,'(*(G0.6,:,","))') & 
+          metyasso(1), metyasso(2), metyasso_roll(1), metyasso_roll(2)
+
+        if (ISNAN(gpp) .or. (gpp .lt. 0.0)) then
+          gpp = 0.0
+        end if
+        gpp_day=gpp_day + gpp
         
         if ((mod(tot_hour,24.0) .eq. 0).and.(tot_hour .gt. 0)) then    ! here assume the start time is always the beginning of the day!
           !Update GDD which is the criteria for phenology stages         
         !  gdd_sum= gdd_sum+temp_day/24.....
-        !  temp_day=0
-          
+
+          temp_day=temp_day/24
+          gpp_day =gpp_day/24
+
           ! run Topmodel
           ! catchment average ground water recharge [m per unit area]
         !  call topmodel(gs or tr_veg, qd(t-1), qr(t)...) 
@@ -452,19 +528,57 @@ program SVMC
             ! also litter input if running yasso on hourly or daily step
       !    call carbon_allocation_day(pheno_stage, npp_sum_day.....)     
             
-            ! Yasso: split input c into various yasso fractions
-      !      call inputs_to_fractions(leaf, root, soluble, compost, fract)
+          !call litter_input(npp_sum, pheno_stage, management, leaf_litter_c, root_litter_c, root_exudent_c)  
+          !HT: Some sensitivity test with harvest residues input
+          !leaf_litter_c= gpp_day * 0.5 * 0.5 * 0.5 * 3600 * 24
+          !root_litter_c= gpp_day * 0.5 * 0.5 * 0.5 * 3600 * 24
+        
+          !call alloc_hypothesis_1(gpp_day, npp_day,  leaf_litter_c, root_litter_c, alloc_para)
+          !AutoResp=gpp_day*0.5*3600*24
+          call alloc_hypothesis_2(gpp_day, npp_day, AutoResp, croot, cleaf, cstem, leaf_litter_c, root_litter_c, &
+                                  above_biomass, below_biomass, yield, &
+                                  lai_alloc, alloc_para, manage_para, pheno_stage, management_type)
           
-      !    end if
+          leaf_litter_c_year = leaf_litter_c_year + leaf_litter_c
+          root_litter_c_year = root_litter_c_year + root_litter_c
 
-          ! Yasso: create average meteorological forcings for yasso
-      !    call average_met(met_daily, met_rolling, aver_size, met_state, met_ind)
+          ! Yasso: split input c into various yasso fractions
+      !   end if
           
           ! Yasso: update soil respiration, should we update soil respiration hourly or daily? 
           ! resp should be an output variable
-      !    call decompose(param, timestep_days, c_input_awenh_day, nitr_input_day, tempr_c, &
-      !                                precip_day, cstate, nstate, ctend, ntend) 
 
+
+          write(99,'(*(G0.6,:,","))') & 
+             soilcn_state%cstate(1), soilcn_state%cstate(2), soilcn_state%cstate(3), soilcn_state%cstate(4), & 
+             soilcn_state%cstate(5), soilcn_state%nstate, soilcn_flux%input_cfract(1), soilcn_flux%input_cfract(2), & 
+             soilcn_flux%input_cfract(3), soilcn_flux%input_cfract(4), soilcn_flux%input_cfract(5), &
+             soilcn_flux%input_nfract, soilcn_flux%ctend(1), soilcn_flux%ctend(2), &
+             soilcn_flux%ctend(3), soilcn_flux%ctend(4), soilcn_flux%ctend(5), soilcn_flux%ntend, & 
+             leaf_litter_c, root_litter_c, metyasso_roll(1),metyasso_roll(2)
+
+          call wrapper_yasso_initialize_flux(soilcn_flux)
+          call inputs_to_fractions(leaf_litter_c, root_litter_c, soluble, compost, soilcn_flux%input_cfract)
+
+          write(99,'(*(G0.6,:,","))') & 
+             soilcn_state%cstate(1), soilcn_state%cstate(2), soilcn_state%cstate(3), soilcn_state%cstate(4), & 
+             soilcn_state%cstate(5), soilcn_state%nstate, soilcn_flux%input_cfract(1), soilcn_flux%input_cfract(2), & 
+             soilcn_flux%input_cfract(3), soilcn_flux%input_cfract(4), soilcn_flux%input_cfract(5), &
+             soilcn_flux%input_nfract, soilcn_flux%ctend(1), soilcn_flux%ctend(2), &
+             soilcn_flux%ctend(3), soilcn_flux%ctend(4), soilcn_flux%ctend(5), soilcn_flux%ntend
+
+          call wrapper_yasso_decompose(soilcn_state, soilcn_flux, yasso_para, 1.0, temp_day, precip_day)
+
+          write(99,'(*(G0.6,:,","))') & 
+             soilcn_state%cstate(1), soilcn_state%cstate(2), soilcn_state%cstate(3), soilcn_state%cstate(4), & 
+             soilcn_state%cstate(5), soilcn_state%nstate, soilcn_flux%input_cfract(1), soilcn_flux%input_cfract(2), & 
+             soilcn_flux%input_cfract(3), soilcn_flux%input_cfract(4), soilcn_flux%input_cfract(5), &
+             soilcn_flux%input_nfract, soilcn_flux%ctend(1), soilcn_flux%ctend(2), &
+             soilcn_flux%ctend(3), soilcn_flux%ctend(4), soilcn_flux%ctend(5), soilcn_flux%ntend
+
+          HeteroResp= sum(-soilcn_flux%ctend)
+          TotalResp=HeteroResp+AutoResp
+          
           ! We could also put yasso here can do the daily calculation for NEE
           ! call yasso20_day()
           ! nee_day= .......
@@ -472,11 +586,29 @@ program SVMC
           ! Write output for daily variables
           if(step_nc_day.eq.0)then
             !Initialize netcdf file
-            call netCDF_prepareOUTPUT(output_filename_day, lon_sites, lat_sites, ntim_out_day)
+            call netCDF_prepareOUTPUT(output_filename_day, lon_sites, lat_sites, ntim_out_day-1)
           end if
+          
+          tmp_matrix(1,1,1)=HeteroResp
+          call netCDF_writeOUTPUT(output_filename_day, "HeteroResp", tmp_matrix, tot_hour/24.0, step_nc_day) 
+          tmp_matrix(1,1,1)=AutoResp
+          call netCDF_writeOUTPUT(output_filename_day, "AutoResp", tmp_matrix, tot_hour/24.0, step_nc_day)         
+          tmp_matrix(1,1,1)=TotalResp
+          call netCDF_writeOUTPUT(output_filename_day, "TotalResp", tmp_matrix, tot_hour/24.0, step_nc_day) 
+          tmp_matrix(1,1,1)=lai_alloc
+          call netCDF_writeOUTPUT(output_filename_day, "LAI", tmp_matrix, tot_hour/24.0, step_nc_day) 
+          tmp_matrix(1,1,1)=above_biomass + below_biomass
+          call netCDF_writeOUTPUT(output_filename_day, "TotLivBiom", tmp_matrix, tot_hour/24.0, step_nc_day)
+          tmp_matrix(1,1,1)=cleaf
+          call netCDF_writeOUTPUT(output_filename_day, "leaf_carbon_content", tmp_matrix, tot_hour/24.0, step_nc_day)  
+          tmp_matrix(1,1,1)=croot
+          call netCDF_writeOUTPUT(output_filename_day, "root_carbon_content", tmp_matrix, tot_hour/24.0, step_nc_day) 
+          tmp_matrix(1,1,1)=metyasso_roll(1)
+          call netCDF_writeOUTPUT(output_filename_day, "temperature_yasso", tmp_matrix, tot_hour/24.0, step_nc_day) 
+          tmp_matrix(1,1,1)=metyasso_roll(2)
+          call netCDF_writeOUTPUT(output_filename_day, "precipitation_yasso", tmp_matrix, tot_hour/24.0, step_nc_day) 
 
-         ! call netCDF_writeOUTPUT(output_filename_day, "HeteroResp", hr, tot_hour/24, step_nc_day)           
-         ! step_nc_day= step_nc_day+1                
+          step_nc_day= step_nc_day+1                
 
       !    gpp_sum_day =0
       !    npp_sum_day =0
@@ -498,6 +630,19 @@ program SVMC
       !    gpp_sum_year=0
       !    npp_sum_year=0
       !    gdd_sum=0  
+          
+          gpp_day=0.0
+          temp_day=0.0
+          precip_day=0.0
+
+        end if
+
+        if ((mod(tot_hour,24*365.0) .eq. 0).and.(tot_hour .gt. 0)) then
+
+          call wrapper_yasso_initialize_flux(soilcn_flux)
+          call inputs_to_fractions(leaf_litter_c_year, root_litter_c_year, soluble, compost, soilcn_flux%input_cfract)
+          call wrapper_yasso_decompose(soilcn_state0, soilcn_flux, yasso_para, real(step_nc_day+1), &
+                                                        temp_year/(tot_hour+1), precip_year)
 
         end if
 
@@ -509,6 +654,23 @@ program SVMC
   end do ! t
 
   !call write_restart()
+
+  write(99,'(*(G0.6,:,","))') & 
+       soilcn_state0%cstate(1), soilcn_state0%cstate(2), soilcn_state0%cstate(3), soilcn_state0%cstate(4), & 
+       soilcn_state0%cstate(5), soilcn_state0%nstate, leaf_litter_c_year, root_litter_c_year, step_nc_day, &
+       temp_year/step_nc_day, precip_year
+
+  call wrapper_yasso_initialize_flux(soilcn_flux)
+  call inputs_to_fractions(leaf_litter_c_year, root_litter_c_year, soluble, compost, soilcn_flux%input_cfract)
+  call wrapper_yasso_decompose(soilcn_state0, soilcn_flux, yasso_para, real(step_nc_day+1), &
+                                                      temp_year/(tot_hour), precip_year)
+
+  write(99,'(*(G0.6,:,","))') & 
+       soilcn_state0%cstate(1), soilcn_state0%cstate(2), soilcn_state0%cstate(3), soilcn_state0%cstate(4), & 
+       soilcn_state0%cstate(5), soilcn_state0%nstate, soilcn_flux%input_cfract(1), soilcn_flux%input_cfract(2), & 
+       soilcn_flux%input_cfract(3), soilcn_flux%input_cfract(4), soilcn_flux%input_cfract(5), &
+       soilcn_flux%input_nfract, soilcn_flux%ctend(1), soilcn_flux%ctend(2), &
+       soilcn_flux%ctend(3), soilcn_flux%ctend(4), soilcn_flux%ctend(5), soilcn_flux%ntend
 
 end program SVMC
 

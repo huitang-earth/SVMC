@@ -43,8 +43,8 @@ contains
                pftdim_id, pftvar_id, gppvar_id, neevar_id, nppvar_id, trvar_id, arvar_id, &
                hrvar_id, srvar_id, laivar_id, scvar_id, stvar_id, evvar_id, travar_id, &
                smvar_id, smpvar_id, cyvar_id, abvar_id, tbvar_id, lcvar_id, rcvar_id, fpvar_id, &
-               namedim_id, jmvar_id, vcvar_id, dpsivar_id, chivar_id, provar_id, &
-               cevvar_id, gevvar_id, tfvar_id, civar_id, ulvar_id, pivar_id, rfvar_id, &
+               namedim_id, jmvar_id, vcvar_id, dpsivar_id, chivar_id, provar_id, tempyasso_id, &
+               preyasso_id, cevvar_id, gevvar_id, tfvar_id, civar_id, ulvar_id, pivar_id, rfvar_id, &
                invar_id, drvar_id, tsivar_id, psvar_id, wsvar_id,wstvar_id, csvar_id, swevar_id
                
     integer :: nx_lon=1, ny_lat=1, ntim
@@ -117,6 +117,9 @@ contains
     call check(nf90_def_var(nc_id, "Chi", nf90_float, (/londim_id,latdim_id,timedim_id/), chivar_id))
     call check(nf90_def_var(nc_id, "Dpsi", nf90_float, (/londim_id,latdim_id,timedim_id/), dpsivar_id))
     call check(nf90_def_var(nc_id, "Profit", nf90_float, (/londim_id,latdim_id,timedim_id/), provar_id))
+
+    call check(nf90_def_var(nc_id, "precipitation_yasso", nf90_float, (/londim_id,latdim_id,timedim_id/), preyasso_id))
+    call check(nf90_def_var(nc_id, "temperature_yasso", nf90_float, (/londim_id,latdim_id,timedim_id/), tempyasso_id))
 
     !Attributes
     call check(NF90_PUT_ATT(nc_id, lonvar_id, "units", "degrees_east"))
@@ -266,6 +269,13 @@ contains
     call check(NF90_PUT_ATT(nc_id, provar_id, "standard_name", "Profit"))
     call check(NF90_PUT_ATT(nc_id, provar_id, "long_name", "Optimized profit of photosynthesis"))
 
+    call check(NF90_PUT_ATT(nc_id, preyasso_id, "units", "kg m-2 s-1"))
+    call check(NF90_PUT_ATT(nc_id, preyasso_id, "standard_name", "Precipitation for yasso"))
+    call check(NF90_PUT_ATT(nc_id, preyasso_id, "long_name", "Smoothed precipitation for yasso"))
+
+    call check(NF90_PUT_ATT(nc_id, tempyasso_id, "units", "degree celsius"))
+    call check(NF90_PUT_ATT(nc_id, tempyasso_id, "standard_name", "Temperature for yasso"))
+    call check(NF90_PUT_ATT(nc_id, tempyasso_id, "long_name", "Smoothed temperature for yasso"))
 
     !Finished defining
     call check( nf90_enddef(nc_id) )
