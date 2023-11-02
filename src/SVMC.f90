@@ -398,6 +398,8 @@ program SVMC
         ! JV: compare annual balance with daily calculation
         metyasso(1)=temp-273.15
         metyasso(2)=prec
+
+
       
         ! 30-day moving averaging 
         ! call average_met(metyasso, metyasso_roll, 24*30, &
@@ -408,6 +410,10 @@ program SVMC
         
         temp_day=temp_day+metyasso_roll(1)
         precip_day=precip_day+metyasso_roll(2)*time_step*3600
+        
+        temp_year=temp_year + temp-273.15
+        precip_year= precip_year + prec*time_step*3600
+
 
         write(99,'(*(G0.6,:,","))') & 
           metyasso(1), metyasso(2), metyasso_roll(1), metyasso_roll(2)
@@ -423,9 +429,6 @@ program SVMC
 
           temp_day=temp_day/24
           gpp_day =gpp_day/24
-
-          temp_year=temp_year + temp_day
-          precip_year= precip_year + precip_day
 
           ! run Topmodel
           ! catchment average ground water recharge [m per unit area]
@@ -563,7 +566,7 @@ program SVMC
           call wrapper_yasso_initialize_flux(soilcn_flux)
           call inputs_to_fractions(leaf_litter_c_year, root_litter_c_year, soluble, compost, soilcn_flux%input_cfract)
           call wrapper_yasso_decompose(soilcn_state0, soilcn_flux, yasso_para, real(step_nc_day+1), &
-                                                        temp_year/(step_nc_day+1), precip_year)
+                                                        temp_year/(tot_hour+1), precip_year)
 
         end if
 
@@ -584,7 +587,7 @@ program SVMC
   call wrapper_yasso_initialize_flux(soilcn_flux)
   call inputs_to_fractions(leaf_litter_c_year, root_litter_c_year, soluble, compost, soilcn_flux%input_cfract)
   call wrapper_yasso_decompose(soilcn_state0, soilcn_flux, yasso_para, real(step_nc_day+1), &
-                                                      temp_year/(step_nc_day+1), precip_year)
+                                                      temp_year/(tot_hour), precip_year)
 
   write(99,'(*(G0.6,:,","))') & 
        soilcn_state0%cstate(1), soilcn_state0%cstate(2), soilcn_state0%cstate(3), soilcn_state0%cstate(4), & 
