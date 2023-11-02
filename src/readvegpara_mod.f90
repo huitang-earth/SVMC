@@ -20,10 +20,6 @@ MODULE readvegpara_mod
     real(8) :: gamma    !cost of hydraulic repair
   end type par_cost_type
 
-  character(len=256), public  :: opt_hypothesis, pft_type        ! character, Either "Lc" or "PM"
-  integer  :: num_pft
-  real(8)  :: conductivity, psi50, b, alpha, gamma
-
   type, public :: par_env_type
     real(8) :: viscosity_water     
     real(8) :: density_water             
@@ -56,60 +52,9 @@ MODULE readvegpara_mod
   real(8)            :: c_molmass =12.0107  ! molecular mass of carbon (g/mol)
   real(8)            :: h2o_molmass =18.01528  ! molecular mass of carbon (g/mol)
   
-  !------------------------------------
-  ! Canopy water parameters (Spafhy)
-  !------------------------------------
-  
-  ! canopy interception
-  real(8)            :: kv = 0.4  ! von Karman constant (-)
-  real(8)            :: beta_aero=285.0   ! s/m, from Campbell & Norman eq. (7.33) x 42.0 molm-3
-  real(8) :: wmax     ! storage capacity for rain (mm/LAI), Hui: this is too much compared to CTSM
-  real(8) :: wmaxsnow ! storage capacity for snow (mm/LAI), Hui: this is reasonable
-
-  ! LAI is annual maximum LAI and for gridded simulations are input from GisData!
-  ! keys must be 'LAI_ + key in spec_para
-  !real(r8)  :: LAI_conif
-  !real(r8)  :: LAI_decid
-  real(8)  :: hc         ! canopy height (m)
-  real(8)  :: cf         ! canopy closure fraction (-)
-  real(8)  :: w_leaf     ! leaf length scale (m)
-
-  ! canopy conductance                     
-  ! real(r8), parameter :: kp =0.6         ! c Hui: This overlaps with p-hydro
-  real(8) :: rw         ! critical value for REW (-),
-  real(8) :: rwmin        ! minimum relative conductance (-)
-  ! soil evaporation
-  real(8) :: gsoil              ! soil surface conductance if soil is fully wet (m/s)
-
-  ! CFT parameters (not needed in spafhy, replaced by p-hydro)
-  ! 'amax': 10.0, # maximum photosynthetic rate (umolm-2(leaf)s-1)
-  ! 'g1': 2.1, # stomatal parameter
-  ! 'q50': 50.0, # light response parameter (Wm-2)
-  ! 'lai_cycle': False,
-
-  ! phenology (not needed, will be replaced by penology module in svm)
-
-  ! 'smax': 18.5, # degC
-  ! 'tau': 13.0,  # days
-  ! 'xo': -4.0, # degC
-  ! 'fmin': 0.05, # minimum photosynthetic capacity in winter (-)
-                           
-  ! annual cycle of leaf-area in deciduous trees
-  !real(r8) :: lai_decid_min = 0.1     ! minimum relative LAI (-)
-  !real(r8) :: ddo= 45.0               ! degree-days for bud-burst (5degC threshold)
-  !real(r8) :: ddur= 23.0              ! duration of leaf development (days)
-  !real(r8) :: sdl= 9.0                ! daylength for senescence start (h)
-  !real(r8) :: sdur= 30.0              ! duration of leaf senescence (days),     
-
-  ! degree-day snow model
-  real(8) :: kmelt         ! melt coefficient in open (mm/s)
-  real(8) :: kfreeze       ! freezing coefficient (mm/s)
-  real(8) :: frac_snowliq              ! r, maximum fraction of liquid in snow (-)
-
-  ! flow field
-  real(8) :: zmeas    
-  real(8) :: zground   
-  real(8) :: zo_ground 
+  character(len=256), public  :: opt_hypothesis, pft_type        ! character, Either "Lc" or "PM"
+  integer  :: num_pft
+  real(8)  :: conductivity, psi50, b, alpha, gamma
 
 contains
 
@@ -128,21 +73,8 @@ contains
       b, &
       alpha, &
       gamma, &
-      opt_hypothesis, &
-      wmax, &
-      wmaxsnow, &
-      hc ,&
-      cf, &
-      rw, &
-      rwmin, &
-      gsoil, &
-      kmelt, &
-      kfreeze, &
-      zmeas, &
-      zground, &
-      zo_ground
-     
-     
+      opt_hypothesis
+
     old=.false.
     num_pft=1
     pft_type="grass"
@@ -160,36 +92,6 @@ contains
 
     opt_hypothesis= 'PM'          ! character, Either "LC" or "PM"     
 
-    ! Parameters related to Spafhy
-
-    ! Canopy water parameters (Spafhy)
-    ! canopy interception
-    wmax = 0.5      ! storage capacity for rain (mm/LAI), default: 1.5 too high? Hui: this is too much compared to CTSM
-    wmaxsnow = 4.5  ! storage capacity for snow (mm/LAI), Hui: this is reasonable
-
-    ! LAI is annual maximum LAI and for gridded simulations are input from GisData!
-    ! keys must be 'LAI_ + key in spec_para
-    hc = 0.6         ! canopy height (m)
-    cf = 0.6          ! canopy closure fraction (-)
-    w_leaf=0.01       !leaf length scale (m)
-
-    ! canopy conductance                     
-    ! real(r8), parameter :: kp =0.6         ! canopy light attenuation parameter (-) Hui: This overlaps with p-hydro
-    rw =0.20          ! critical value for REW (-),
-    rwmin=0.02        ! minimum relative conductance (-)
-  
-    ! soil evaporation
-    gsoil=1e-2              ! soil surface conductance if soil is fully wet (m/s)
-
-    ! degree-day snow model
-    kmelt   = 2.8934e-05    ! melt coefficient in open (mm/s)
-    kfreeze = 5.79e-6       ! freezing coefficient (mm/s)
-    frac_snowliq = 0.05          ! maximum fraction of liquid in snow (-)
-
-    ! flow field
-    zmeas     = 2.0
-    zground   = 0.5
-    zo_ground = 0.01 
   
     ! Reading namelist
    ! open(unitvegpara, file='./veg_namelist', status='old', form='formatted', err=999)

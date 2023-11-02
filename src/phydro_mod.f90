@@ -89,7 +89,7 @@ contains
     par_plant%conductivity=conductivity
     par_plant%psi50       =psi50
     par_plant%b           =b
-    print *, "alpha=", alpha
+    !print *, "alpha=", alpha
     par_cost%alpha        =alpha
     par_cost%gamma        =gamma
   
@@ -202,22 +202,22 @@ contains
     dsave(1:29)=0.0      !
     maxIterations=1000    ! The original model use 500, so 1000 should be fine.
      
-    print *, "Before call, f=", profit,"  task number ",task, " "
+    !print *, "Before call, f=", profit,"  task number ",task, " "
 
     do iter = 1, maxIterations
       call setulb(n, m, x, l, u, nbd, profit, grad, factr, pgtol, wa, iwa, task, iprint, csave, lsave, isave, dsave)
      ! Print some basic informations about the optimization process 
-      print *, "lbfgsb3 parameter results:", x
-      print *, "task is ", task
+     ! print *, "lbfgsb3 parameter results:", x
+     ! print *, "task is ", task
       
      ! Print
       if (task(1:2) == 'FG') then
-        print *, "computing f and g at ", x
+      !  print *, "computing f and g at ", x
         ! Compute function value f for the sample problem.
         lj_dps%logjmax=x(1)
         lj_dps%dpsi=x(2)
         profit= fn_profit(lj_dps, psi_soil, par_cost, par_photosynth, par_plant, par_env, .True.)
-        print *, "At iteration", isave(34), " f =", profit
+      ! print *, "At iteration", isave(34), " f =", profit
 
         ! Compute gradient g for the sample problem.
         !call gradient(grad, lj_dps, psi_soil,par_photosynth, par_plant, par_env, par_cost)
@@ -233,10 +233,10 @@ contains
 
         grad(1)=(profit1-profit)/0.001
         grad(2)=(profit2-profit)/0.001
-        print *, "max(abs(g))=", max(abs(grad(1)), abs(grad(2))), grad(1), grad(2)
+      !  print *, "max(abs(g))=", max(abs(grad(1)), abs(grad(2))), grad(1), grad(2)
 
       else if (task(1:5) == 'NEW_X') then
-        print *, "Continue"        !what is the meaning of "NEW_X"? 
+      !  print *, "Continue"        !what is the meaning of "NEW_X"? 
         continue
       !If task is neither FG nor NEW_X we terminate execution.
       else
@@ -290,15 +290,15 @@ contains
     ca = par_photosynth%ca/par_photosynth%patm*1e6
     delta  = par_photosynth%delta
     
-    print *, "J=", gs, ca, X, g, delta, ks
+    !print *, "J=", gs, ca, X, g, delta, ks
     J  = 4*gs*ca*(1-X)*(X+2*g)/(X*(1-delta)-(g+delta*ks)) 
 
     p = par_photosynth%phi0 * par_photosynth%Iabs
-    print *, "p=", par_photosynth%phi0, par_photosynth%Iabs 
-    print *, "djmax_dJ=", p, J
+    !print *, "p=", par_photosynth%phi0, par_photosynth%Iabs 
+    !print *, "djmax_dJ=", p, J
     djmax_dJ = (4.0*p)**3.0/((4.0*p)**2.0-J**2.0)**(3.0/2.0)   
     
-    print *, "dj_dchi=", delta, g, ks, X, gs, ca
+    !print *, "dj_dchi=", delta, g, ks, X, gs, ca
     dJ_dchi = 4.0*gs*ca * ((delta*(2.0*g*(ks + 1) + ks*(2.0*X - 1) + X**2.0)       &
                       - ((X-g)**2.0+3.0*g*(1.0-g)))/(delta*(ks + X) + g - X)**2.0)
  
@@ -308,8 +308,8 @@ contains
     grad(2) = gsprime*ca*(1-X) - par_cost%alpha * djmax_dJ * &
                   dJ_ddpsi - 2*par_cost%gamma*dpsi ! /par_plantpsi50^2
 
-    print *, "grad1=", grad(1),gs, ca, par_cost%alpha, djmax_dJ, dJ_dchi 
-    print *, "grad2=", grad(2), gsprime, ca, X, dJ_ddpsi, par_cost%gamma, dpsi 
+    !print *, "grad1=", grad(1),gs, ca, par_cost%alpha, djmax_dJ, dJ_dchi 
+    !print *, "grad2=", grad(2), gsprime, ca, X, dJ_ddpsi, par_cost%gamma, dpsi 
 
     ! One dimension root-finding (dFdx) 
     !gs = calc_gs(dpsi, psi_soil, par_plant, par_env)#* 1e6/par_photosynth$patm
@@ -763,7 +763,7 @@ contains
         if ( -root < 3.00*epsilon(b) )then
            root = 0.00
         else
-           print *, "error 2"
+           !print *, "error 2"
            return
         end if
      end if
@@ -771,15 +771,15 @@ contains
     if (a == 0.0) then
       if (b == 0.0) then
         r1 = 0.0
-        print *, "quadratic solution1"
+!        print *, "quadratic solution1"
       else
         r1 = -c/b
-        print *, "quadratic solution2"
+!        print *, "quadratic solution2"
       end if
     else
       q = -0.50 * (b + sqrt(root))
       r1 = q / a
-      print *, "quadratic solution3"
+!      print *, "quadratic solution3"
     end if
          
   end subroutine quadratic
@@ -809,13 +809,13 @@ contains
     jmax = exp(par%logjmax)  ! Jmax in umol/m2/s (logjmax is supplied by the optimizer)
     dpsi = par%dpsi          ! delta Psi in MPa
 
-    print *, "jmax=", jmax
-    print *, "dpsi=", dpsi
+    !print *, "jmax=", jmax
+    !print *, "dpsi=", dpsi
   
     gs = calc_gs(dpsi, psi_soil, par_plant, par_env)  ! gs in mol/m2/s/Mpa
     E = 1.6*gs*(par_env%vpd/par_env%patm)*1e6         ! E in umol H2O/m2/s
 
-    print *, gs, E
+    !print *, gs, E
   
     ! light-limited assimilation
     call calc_assim_light_limited(ci, aj, gs, jmax, par_photosynth)  ! Aj in umol/m2/s
@@ -823,14 +823,14 @@ contains
     vcmax = aj*(ci + par_photosynth%kmm)/(ci*(1-par_photosynth%delta)-     &
                 (par_photosynth%gammastar+par_photosynth%kmm*par_photosynth%delta))
 
-    print *, "vcmax=", vcmax            
+    !print *, "vcmax=", vcmax            
 
     costs = par_cost%alpha * jmax + par_cost%gamma * dpsi**2     !((abs((-dpsi)/par_plant$psi50)))^2  
     benefit = 1.0                                                 !(1+1/(par_photosynth$ca/40.53))/2
     dummy_costs = 0.0*exp(20.0*(-abs(dpsi/4.0)-abs(jmax/1.0)))          ! ONLY added near (0,0) for numerical stability. 
   
-    print *, "costs=", par_cost%alpha, par_cost%gamma, jmax, dpsi
-    print *, "aj=", aj, costs, dummy_costs, opt_hypothesis, do_optim
+    !print *, "costs=", par_cost%alpha, par_cost%gamma, jmax, dpsi
+    !print *, "aj=", aj, costs, dummy_costs, opt_hypothesis, do_optim
     if (opt_hypothesis == "PM") then
       ! Profit Maximisation
       fn_profit = aj*benefit - costs - dummy_costs
@@ -840,7 +840,7 @@ contains
     end if
   
     if (do_optim) then
-      print *, "doing optimization", do_optim
+      !print *, "doing optimization", do_optim
       fn_profit= -fn_profit
     else
       fn_profit=fn_profit

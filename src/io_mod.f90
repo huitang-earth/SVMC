@@ -44,7 +44,9 @@ contains
                hrvar_id, srvar_id, laivar_id, scvar_id, stvar_id, evvar_id, travar_id, &
                smvar_id, smpvar_id, cyvar_id, abvar_id, tbvar_id, lcvar_id, rcvar_id, fpvar_id, &
                namedim_id, jmvar_id, vcvar_id, dpsivar_id, chivar_id, provar_id, tempyasso_id, &
-               preyasso_id
+               preyasso_id, cevvar_id, gevvar_id, tfvar_id, civar_id, ulvar_id, pivar_id, rfvar_id, &
+               invar_id, drvar_id, tsivar_id, psvar_id, wsvar_id,wstvar_id, csvar_id, swevar_id
+               
     integer :: nx_lon=1, ny_lat=1, ntim
     integer :: yyyy,mm,dd,hh,mi,ss
 
@@ -80,11 +82,29 @@ contains
     call check(nf90_def_var(nc_id, "SoilResp", nf90_float, (/londim_id,latdim_id,timedim_id/), srvar_id))
     call check(nf90_def_var(nc_id, "LAI", nf90_float, (/londim_id,latdim_id,timedim_id/), laivar_id))
     call check(nf90_def_var(nc_id, "soil_carbon_content", nf90_float, (/londim_id,latdim_id,timedim_id/), scvar_id))    
-    call check(nf90_def_var(nc_id, "stomatal_conductance", nf90_float, (/londim_id,latdim_id,timedim_id/), stvar_id))   
+    call check(nf90_def_var(nc_id, "stomatal_conductance", nf90_float, (/londim_id,latdim_id,timedim_id/), stvar_id)) 
+
     call check(nf90_def_var(nc_id, "Evap", nf90_float, (/londim_id,latdim_id,timedim_id/), evvar_id))   
     call check(nf90_def_var(nc_id, "Transp", nf90_float, (/londim_id,latdim_id,timedim_id/), travar_id))
+    call check(nf90_def_var(nc_id, "CanopyEvap", nf90_float, (/londim_id,latdim_id,timedim_id/), cevvar_id))   
+    call check(nf90_def_var(nc_id, "GroundEvap", nf90_float, (/londim_id,latdim_id,timedim_id/), gevvar_id))
+    call check(nf90_def_var(nc_id, "Trfall", nf90_float, (/londim_id,latdim_id,timedim_id/), tfvar_id))   
+    call check(nf90_def_var(nc_id, "CanopyInterc", nf90_float, (/londim_id,latdim_id,timedim_id/), civar_id))
+    call check(nf90_def_var(nc_id, "PotInf", nf90_float, (/londim_id,latdim_id,timedim_id/), pivar_id))   
+    call check(nf90_def_var(nc_id, "Unload", nf90_float, (/londim_id,latdim_id,timedim_id/), ulvar_id))
+    call check(nf90_def_var(nc_id, "Roff", nf90_float, (/londim_id,latdim_id,timedim_id/), rfvar_id))   
+    call check(nf90_def_var(nc_id, "Drain", nf90_float, (/londim_id,latdim_id,timedim_id/), drvar_id))
+    call check(nf90_def_var(nc_id, "Inflow", nf90_float, (/londim_id,latdim_id,timedim_id/), invar_id))   
+    call check(nf90_def_var(nc_id, "TopSoilInterc", nf90_float, (/londim_id,latdim_id,timedim_id/), tsivar_id))
+
+    call check(nf90_def_var(nc_id, "WatSto", nf90_float, (/londim_id,latdim_id,timedim_id/), wsvar_id))
+    call check(nf90_def_var(nc_id, "PondSto", nf90_double, (/londim_id,latdim_id,timedim_id/), psvar_id))
+    call check(nf90_def_var(nc_id, "WatStoTop", nf90_float, (/londim_id,latdim_id,timedim_id/), wstvar_id))
+    call check(nf90_def_var(nc_id, "CanopyStorage", nf90_double, (/londim_id,latdim_id,timedim_id/), csvar_id))
+    call check(nf90_def_var(nc_id, "swe", nf90_float, (/londim_id,latdim_id,timedim_id/), swevar_id))
     call check(nf90_def_var(nc_id, "SoilMoist", nf90_float, (/londim_id,latdim_id,timedim_id/), smvar_id))
     call check(nf90_def_var(nc_id, "SoilMoistPot", nf90_double, (/londim_id,latdim_id,timedim_id/), smpvar_id))
+
     call check(nf90_def_var(nc_id, "CropYield", nf90_float, (/londim_id,latdim_id,timedim_id/), cyvar_id))
     call check(nf90_def_var(nc_id, "AGB", nf90_float, (/londim_id,latdim_id,timedim_id/), abvar_id))
     call check(nf90_def_var(nc_id, "TotLivBiom", nf90_float, (/londim_id,latdim_id,timedim_id/), tbvar_id))
@@ -154,14 +174,62 @@ contains
     call check(NF90_PUT_ATT(nc_id, stvar_id, "units", "mol CO2 m-2 s-1"))     ! Unit not consistent with pecan
     call check(NF90_PUT_ATT(nc_id, stvar_id, "standard_name", "stomatal_conductance"))
     call check(NF90_PUT_ATT(nc_id, stvar_id, "long_name", "Stomatal Conductance"))
+
     call check(NF90_PUT_ATT(nc_id, evvar_id, "units", "kg m-2 s-1"))
     call check(NF90_PUT_ATT(nc_id, evvar_id, "standard_name", "Evaporation"))
     call check(NF90_PUT_ATT(nc_id, evvar_id, "long_name", "Total Evaporation"))
     call check(NF90_PUT_ATT(nc_id, travar_id, "units", "kg m-2 s-1"))
     call check(NF90_PUT_ATT(nc_id, travar_id, "standard_name", "Transpiration"))
-    call check(NF90_PUT_ATT(nc_id, travar_id, "long_name", "Total transpiration"))
-    call check(NF90_PUT_ATT(nc_id, smvar_id, "units", "kg m-2"))
-    call check(NF90_PUT_ATT(nc_id, smvar_id, "standard_name", "Soil moisture"))
+    call check(NF90_PUT_ATT(nc_id, travar_id, "long_name", "Total Transpiration"))
+    call check(NF90_PUT_ATT(nc_id, cevvar_id, "units", "kg m-2 s-1"))
+    call check(NF90_PUT_ATT(nc_id, cevvar_id, "standard_name", "Canopy Evaporation"))
+    call check(NF90_PUT_ATT(nc_id, cevvar_id, "long_name", "Canopy Evaporation"))
+    call check(NF90_PUT_ATT(nc_id, gevvar_id, "units", "kg m-2 s-1"))
+    call check(NF90_PUT_ATT(nc_id, gevvar_id, "standard_name", "Ground Evaporation"))
+    call check(NF90_PUT_ATT(nc_id, gevvar_id, "long_name", "Ground Evaporation"))
+    call check(NF90_PUT_ATT(nc_id, tfvar_id, "units", "kg m-2 s-1"))
+    call check(NF90_PUT_ATT(nc_id, tfvar_id, "standard_name", "Canopy Throughfall"))
+    call check(NF90_PUT_ATT(nc_id, tfvar_id, "long_name", "Canopy Throughfall"))
+    call check(NF90_PUT_ATT(nc_id, civar_id, "units", "kg m-2 s-1"))
+    call check(NF90_PUT_ATT(nc_id, civar_id, "standard_name", "Canopy Interception"))
+    call check(NF90_PUT_ATT(nc_id, civar_id, "long_name", "Canopy Interception"))
+    call check(NF90_PUT_ATT(nc_id, ulvar_id, "units", "kg m-2 s-1"))
+    call check(NF90_PUT_ATT(nc_id, ulvar_id, "standard_name", "Unloading from canopy"))
+    call check(NF90_PUT_ATT(nc_id, ulvar_id, "long_name", "Unloading from canopy"))
+    call check(NF90_PUT_ATT(nc_id, pivar_id, "units", "kg m-2 s-1"))
+    call check(NF90_PUT_ATT(nc_id, pivar_id, "standard_name", "Potential infiltration to soil"))
+    call check(NF90_PUT_ATT(nc_id, pivar_id, "long_name", "Potential infiltration to soil"))
+
+    call check(NF90_PUT_ATT(nc_id, rfvar_id, "units", "kg m-2 s-1"))
+    call check(NF90_PUT_ATT(nc_id, rfvar_id, "standard_name", "surface runoff"))
+    call check(NF90_PUT_ATT(nc_id, rfvar_id, "long_name", "surface runoff"))
+    call check(NF90_PUT_ATT(nc_id, invar_id, "units", "kg m-2 s-1"))
+    call check(NF90_PUT_ATT(nc_id, invar_id, "standard_name", "total inflow to root zone"))
+    call check(NF90_PUT_ATT(nc_id, invar_id, "long_name", "total inflow to root zone"))
+    call check(NF90_PUT_ATT(nc_id, drvar_id, "units", "kg m-2 s-1"))
+    call check(NF90_PUT_ATT(nc_id, drvar_id, "standard_name", "drainage from root zone"))
+    call check(NF90_PUT_ATT(nc_id, drvar_id, "long_name", "drainage from root zone"))    
+    call check(NF90_PUT_ATT(nc_id, tsivar_id, "units", "kg m-2 s-1"))
+    call check(NF90_PUT_ATT(nc_id, tsivar_id, "standard_name", "interception of top layer"))
+    call check(NF90_PUT_ATT(nc_id, tsivar_id, "long_name", "interception of top layer"))    
+
+    call check(NF90_PUT_ATT(nc_id, psvar_id, "units", "m"))
+    call check(NF90_PUT_ATT(nc_id, psvar_id, "standard_name", "pond storage"))
+    call check(NF90_PUT_ATT(nc_id, psvar_id, "long_name", "pond storage"))
+    call check(NF90_PUT_ATT(nc_id, wsvar_id, "units", "m"))
+    call check(NF90_PUT_ATT(nc_id, wsvar_id, "standard_name", "soil water storage"))
+    call check(NF90_PUT_ATT(nc_id, wsvar_id, "long_name", "soil water storage"))
+    call check(NF90_PUT_ATT(nc_id, wstvar_id, "units", "m"))
+    call check(NF90_PUT_ATT(nc_id, wstvar_id, "standard_name", "top layer water storage"))
+    call check(NF90_PUT_ATT(nc_id, wstvar_id, "long_name", "top layer water storage"))
+    call check(NF90_PUT_ATT(nc_id, csvar_id, "units", "mm"))
+    call check(NF90_PUT_ATT(nc_id, csvar_id, "standard_name", "canopy water storage"))
+    call check(NF90_PUT_ATT(nc_id, csvar_id, "long_name", "canopy water storage"))
+    call check(NF90_PUT_ATT(nc_id, swevar_id, "units", "mm"))
+    call check(NF90_PUT_ATT(nc_id, swevar_id, "standard_name", "snow water equivalent"))
+    call check(NF90_PUT_ATT(nc_id, swevar_id, "long_name", "snow water equivalent"))
+    call check(NF90_PUT_ATT(nc_id, smvar_id, "units", "m3 m-3"))
+    call check(NF90_PUT_ATT(nc_id, smvar_id, "standard_name", "Volumetric soil moisture"))
     call check(NF90_PUT_ATT(nc_id, smvar_id, "long_name", "Average Layer Soil Moisture"))
     call check(NF90_PUT_ATT(nc_id, smpvar_id, "units", "MPa"))
     call check(NF90_PUT_ATT(nc_id, smpvar_id, "standard_name", "soil water potential"))
@@ -225,7 +293,7 @@ contains
   end subroutine netCDF_prepareOUTPUT
 
 
-  subroutine netCDF_writeOUTPUT(filename, var_name, var_data, time, i)
+  subroutine netCDF_writeOUTPUT(filename, var_name, var, time, i)
 
      use netcdf
      implicit none
@@ -233,7 +301,11 @@ contains
      character(*) :: filename, var_name
      integer :: i, ncid, VarId_date, VarId_var
      real(8)    :: time
-     real(8), dimension(:,:,:) :: var_data
+     real(8)    :: var
+
+     real(8), dimension(1,1,1) :: var_data
+
+     var_data(1,1,1)=var
 
      call check (nf90_open(filename, nf90_Write, ncid))
      !Get id number

@@ -9,7 +9,9 @@
 - The program **SVMC** will appear in the `src` folder.
 - Need to adapt the [library path](https://https://github.com/huitang-earth/SVMC/blob/9738c7a5dc576ad472d9b5fc4664d79b576b7891/src/Makefile#L16) and [include path](https://github.com/huitang-earth/SVMC/blob/9738c7a5dc576ad472d9b5fc4664d79b576b7891/src/Makefile#L8) of netcdf library when needed. 
 - Only **gfortran** is tested at the moment!
-
+- For compiling SVM on Puhti, need to load the modules. 
+`module load gcc/11.3.0 openmpi/4.1.4 netcdf-fortran/4.5.4`
+ 
 ## Running the test (Qvidja, 2021) with phydro-spafhy
 
 `./SVMC`
