@@ -511,6 +511,10 @@ program SVMC
           call netCDF_writeOUTPUT(output_filename_day, "leaf_carbon_content", tmp_matrix, tot_hour/24.0, step_nc_day)  
           tmp_matrix(1,1,1)=croot
           call netCDF_writeOUTPUT(output_filename_day, "root_carbon_content", tmp_matrix, tot_hour/24.0, step_nc_day) 
+          tmp_matrix(1,1,1)=metyasso_roll(1)
+          call netCDF_writeOUTPUT(output_filename_day, "temperature_yasso", tmp_matrix, tot_hour/24.0, step_nc_day) 
+          tmp_matrix(1,1,1)=metyasso_roll(2)
+          call netCDF_writeOUTPUT(output_filename_day, "precipitation_yasso", tmp_matrix, tot_hour/24.0, step_nc_day) 
 
           step_nc_day= step_nc_day+1                
 
