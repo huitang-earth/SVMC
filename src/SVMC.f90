@@ -49,13 +49,13 @@ program SVMC
 
   ! p-hydro variabless
   ! Input variables for p-hydro (the definition is from rpmodel.R)
-  real(8)     ::    temp, temp_day         ! Air temperature (tc), K
+  real(8)     ::    temp, temp_day, temp_year         ! Air temperature (tc), K
   real(8)     ::    ppfd      ! Photosynthetic photon flux density (mol m-2 d-1) (incoming solar radiation from forcing data?)
   real(8)     ::    vpd       ! Vapour pressure deficit (Pa) (will be calculated using pressure & humidity)
   real(8)     ::    co2       ! Atmospheric CO2 concentration (ppm)
   real(8)     ::    elv       ! Elevation above sea-level (m.a.s.l.) (not needed if we have surface pressure!)
   real(8)     ::    fapar     ! Fraction of absorbed photosynthetically active radiation (unitless) (will be calculated using LAI)
-  real(8)     ::    prec, precip_day       ! 
+  real(8)     ::    prec, precip_day, precip_year       ! 
   real(8)     ::    pres
   real(8)     ::    sh
   real(8)     ::    rh
@@ -96,6 +96,7 @@ program SVMC
   ! yasso variables
   real(8)    :: HeteroResp, AutoResp,TotalResp
   real(8)    :: leaf_litter_c, root_litter_c, soluble=0.0, compost=0.0
+  real(8)    :: leaf_litter_c_year, root_litter_c_year
   real(8)    :: metyasso_roll(2), metyasso(2)
   real(8)    :: metyasso_state(2,24*30+1)
   integer    :: metyasso_ind
@@ -118,7 +119,7 @@ program SVMC
   type(canopywater_type)        :: canopywater_state
   type(snowwater_type)          :: snowwater_state
   
-  type(soilcn_state_type)       :: soilcn_state
+  type(soilcn_state_type)       :: soilcn_state, soilcn_state0
   type(soilcn_flux_type)        :: soilcn_flux
   type(yasso_para_type)         :: yasso_para
   type(alloc_para_type)         :: alloc_para
@@ -151,6 +152,8 @@ program SVMC
   
   ! initialize yasso model: need temperature & precipitation input
   call wrapper_yasso_initialize_totc(soilcn_state, yasso_para)
+  soilcn_state0=soilcn_state
+
   ! call initialize_yasso_totc(param, totc, cn_input, fract_root_input, fract_legacy_soc, &
   !    tempr_c, precip_day, tempr_ampl, cstate, nstate)
 
@@ -178,6 +181,11 @@ program SVMC
   precip_day=0.0
   gpp_day=0.0
 
+  temp_year=0.0
+  precip_year=0.0
+  root_litter_c_year=0.0
+  leaf_litter_c_year=0.0
+
   print *, tot_hour_end, ntim_out_hr, ntim_out_day
   ! Read time series of input data
   call netCDF_readTime(input_climfile, ntim_clim, start_clim_time, end_clim_time)
@@ -194,7 +202,7 @@ program SVMC
 
   print *, num_sites, lat_sites, lon_sites, tot_hour, num_pft   
 
-  open(99, file = 'yassodebug.txt', status = 'old')
+  open(99, file = 'yassodebug5.txt', status = 'old')
   write(99,*) "cstate1,cstate2, cstate3, cstate4, cstate5, nstate, &
               input_cfract1, input_cfract2, input_cfract3, input_cfract4, input_cfract5, input_nfract, &
               ctend1, ctend2, ctend3, ctend4, ctend5, ntend"
@@ -392,8 +400,8 @@ program SVMC
         metyasso(2)=prec
       
         ! 30-day moving averaging 
-        !call average_met(metyasso, metyasso_roll, 24*30, &
-        !                           metyasoo_state, metyasso_ind)
+        ! call average_met(metyasso, metyasso_roll, 24*30, &
+        !                           metyasso_state, metyasso_ind)
 
         ! Exponential smoothing
         call exponential_smooth_met(metyasso, metyasso_roll, metyasso_ind)                            
@@ -412,8 +420,12 @@ program SVMC
         if ((mod(tot_hour,24.0) .eq. 0).and.(tot_hour .gt. 0)) then    ! here assume the start time is always the beginning of the day!
           !Update GDD which is the criteria for phenology stages         
         !  gdd_sum= gdd_sum+temp_day/24.....
+
           temp_day=temp_day/24
           gpp_day =gpp_day/24
+
+          temp_year=temp_year + temp_day
+          precip_year= precip_year + precip_day
 
           ! run Topmodel
           ! catchment average ground water recharge [m per unit area]
@@ -448,7 +460,8 @@ program SVMC
                                   above_biomass, below_biomass, yield, &
                                   lai_alloc, alloc_para, manage_para, pheno_stage, management_type)
           
-
+          leaf_litter_c_year = leaf_litter_c_year + leaf_litter_c
+          root_litter_c_year = root_litter_c_year + root_litter_c
 
           ! Yasso: split input c into various yasso fractions
       !   end if
@@ -545,6 +558,15 @@ program SVMC
 
         end if
 
+        if ((mod(tot_hour,24*365.0) .eq. 0).and.(tot_hour .gt. 0)) then
+
+          call wrapper_yasso_initialize_flux(soilcn_flux)
+          call inputs_to_fractions(leaf_litter_c_year, root_litter_c_year, soluble, compost, soilcn_flux%input_cfract)
+          call wrapper_yasso_decompose(soilcn_state0, soilcn_flux, yasso_para, real(step_nc_day+1), &
+                                                        temp_year/(step_nc_day+1), precip_year)
+
+        end if
+
       end do ! m
     end do  !i
 
@@ -553,6 +575,23 @@ program SVMC
   end do ! t
 
   !call write_restart()
+
+  write(99,'(*(G0.6,:,","))') & 
+       soilcn_state0%cstate(1), soilcn_state0%cstate(2), soilcn_state0%cstate(3), soilcn_state0%cstate(4), & 
+       soilcn_state0%cstate(5), soilcn_state0%nstate, leaf_litter_c_year, root_litter_c_year, step_nc_day, &
+       temp_year/step_nc_day, precip_year
+
+  call wrapper_yasso_initialize_flux(soilcn_flux)
+  call inputs_to_fractions(leaf_litter_c_year, root_litter_c_year, soluble, compost, soilcn_flux%input_cfract)
+  call wrapper_yasso_decompose(soilcn_state0, soilcn_flux, yasso_para, real(step_nc_day+1), &
+                                                      temp_year/(step_nc_day+1), precip_year)
+
+  write(99,'(*(G0.6,:,","))') & 
+       soilcn_state0%cstate(1), soilcn_state0%cstate(2), soilcn_state0%cstate(3), soilcn_state0%cstate(4), & 
+       soilcn_state0%cstate(5), soilcn_state0%nstate, soilcn_flux%input_cfract(1), soilcn_flux%input_cfract(2), & 
+       soilcn_flux%input_cfract(3), soilcn_flux%input_cfract(4), soilcn_flux%input_cfract(5), &
+       soilcn_flux%input_nfract, soilcn_flux%ctend(1), soilcn_flux%ctend(2), &
+       soilcn_flux%ctend(3), soilcn_flux%ctend(4), soilcn_flux%ctend(5), soilcn_flux%ntend
 
 end program SVMC
 
