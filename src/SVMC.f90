@@ -219,7 +219,7 @@ program SVMC
                 &canopy_Interception,canopy_Throughfall,canopy_PotInfiltration,canopy_mbe,canopy_CanopyStorage,&
                 &LE,tr_phydro,gs,soil_Kh,Melt,Freeze,beta_SoilEvap,canopy_Unloading"
                 
-  open(999, file = 'yassodebug5.txt', status = 'old')
+  open(999, file = 'yassodebug.txt', status = 'old')
   write(999,*) "cstate1,cstate2, cstate3, cstate4, cstate5, nstate, &
               input_cfract1, input_cfract2, input_cfract3, input_cfract4, input_cfract5, input_nfract, &
               ctend1, ctend2, ctend3, ctend4, ctend5, ntend"
@@ -417,28 +417,28 @@ program SVMC
           call netCDF_writeOUTPUT(output_filename_hr, "Qle", LE, tot_hour/24.0, step_nc_hr)
           call netCDF_writeOUTPUT(output_filename_hr, "Evap", canopywater_flux%ET/(time_step*3600.0), & 
                                       tot_hour/24.0, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "Transp", tr_spafhy*1e3/(time_step*3600.0), &
+          call netCDF_writeOUTPUT(output_filename_hr, "Transp", tr_spafhy/(time_step*3600.0), &
                                       tot_hour/24, step_nc_hr)
           call netCDF_writeOUTPUT(output_filename_hr, "CanopyEvap", canopywater_flux%CanopyEvap/(time_step*3600.0), &
                                       tot_hour/24.0, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "GroundEvap", canopywater_flux%GroundEvap/(time_step*3600.0), & 
+          call netCDF_writeOUTPUT(output_filename_hr, "GroundEvap", canopywater_flux%SoilEvap/(time_step*3600.0), & 
                                       tot_hour/24, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "Trfall", canopywater_flux%Trfall/(time_step*3600.0), &
+          call netCDF_writeOUTPUT(output_filename_hr, "Trfall", canopywater_flux%Throughfall/(time_step*3600.0), &
                                       tot_hour/24.0, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "CanopyInterc", canopywater_flux%Interc/(time_step*3600.0), &
+          call netCDF_writeOUTPUT(output_filename_hr, "CanopyInterc", canopywater_flux%Interception/(time_step*3600.0), &
                                       tot_hour/24, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "PotInf", canopywater_flux%PotInf/(time_step*3600.0), & 
+          call netCDF_writeOUTPUT(output_filename_hr, "PotInf", canopywater_flux%PotInfiltration/(time_step*3600.0), & 
                                       tot_hour/24.0, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "Unload", canopywater_flux%Unload/(time_step*3600.0), & 
+          call netCDF_writeOUTPUT(output_filename_hr, "Unload", canopywater_flux%Unloading/(time_step*3600.0), & 
                                       tot_hour/24.0, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "Roff", soilwater_flux%Roff*1e3/(time_step*3600.0), & 
+          call netCDF_writeOUTPUT(output_filename_hr, "Roff", soilwater_flux%Runoff /(time_step*3600.0), & 
                                       tot_hour/24.0, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "Drain", soilwater_flux%Drain*1e3/(time_step*3600.0), & 
+          call netCDF_writeOUTPUT(output_filename_hr, "Drain", soilwater_flux%Drainage/(time_step*3600.0), & 
                                       tot_hour/24.0, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "Inflow", soilwater_flux%Inflow*1e3/(time_step*3600.0), & 
+          call netCDF_writeOUTPUT(output_filename_hr, "Inflow", soilwater_flux%LateralFlow/(time_step*3600.0), & 
                                       tot_hour/24.0, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "TopSoilInterc", soilwater_flux%Interc*1e3/(time_step*3600.0), & 
-                                      tot_hour/24.0, step_nc_hr)                    
+          !call netCDF_writeOUTPUT(output_filename_hr, "TopSoilInterc", soilwater_flux%Interc/(time_step*3600.0), & 
+          !                           tot_hour/24.0, step_nc_hr)                    
          
           !Use the units used by original spafhy: [m] for soil water storage, [mm] for canopy water storage
           call netCDF_writeOUTPUT(output_filename_hr, "WatSto", soilwater_state%WatSto, tot_hour/24.0, step_nc_hr)
@@ -590,24 +590,15 @@ program SVMC
             call netCDF_prepareOUTPUT(output_filename_day, lon_sites, lat_sites, ntim_out_day-1)
           end if
           
-          tmp_matrix(1,1,1)=HeteroResp
-          call netCDF_writeOUTPUT(output_filename_day, "HeteroResp", tmp_matrix, tot_hour/24.0, step_nc_day) 
-          tmp_matrix(1,1,1)=AutoResp
-          call netCDF_writeOUTPUT(output_filename_day, "AutoResp", tmp_matrix, tot_hour/24.0, step_nc_day)         
-          tmp_matrix(1,1,1)=TotalResp
-          call netCDF_writeOUTPUT(output_filename_day, "TotalResp", tmp_matrix, tot_hour/24.0, step_nc_day) 
-          tmp_matrix(1,1,1)=lai_alloc
-          call netCDF_writeOUTPUT(output_filename_day, "LAI", tmp_matrix, tot_hour/24.0, step_nc_day) 
-          tmp_matrix(1,1,1)=above_biomass + below_biomass
-          call netCDF_writeOUTPUT(output_filename_day, "TotLivBiom", tmp_matrix, tot_hour/24.0, step_nc_day)
-          tmp_matrix(1,1,1)=cleaf
-          call netCDF_writeOUTPUT(output_filename_day, "leaf_carbon_content", tmp_matrix, tot_hour/24.0, step_nc_day)  
-          tmp_matrix(1,1,1)=croot
-          call netCDF_writeOUTPUT(output_filename_day, "root_carbon_content", tmp_matrix, tot_hour/24.0, step_nc_day) 
-          tmp_matrix(1,1,1)=metyasso_roll(1)
-          call netCDF_writeOUTPUT(output_filename_day, "temperature_yasso", tmp_matrix, tot_hour/24.0, step_nc_day) 
-          tmp_matrix(1,1,1)=metyasso_roll(2)
-          call netCDF_writeOUTPUT(output_filename_day, "precipitation_yasso", tmp_matrix, tot_hour/24.0, step_nc_day) 
+          call netCDF_writeOUTPUT(output_filename_day, "HeteroResp", HeteroResp, tot_hour/24.0, step_nc_day) 
+          call netCDF_writeOUTPUT(output_filename_day, "AutoResp", AutoResp, tot_hour/24.0, step_nc_day)         
+          call netCDF_writeOUTPUT(output_filename_day, "TotalResp", TotalResp, tot_hour/24.0, step_nc_day) 
+          call netCDF_writeOUTPUT(output_filename_day, "LAI", lai_alloc, tot_hour/24.0, step_nc_day) 
+          call netCDF_writeOUTPUT(output_filename_day, "TotLivBiom", above_biomass + below_biomass, tot_hour/24.0, step_nc_day)
+          call netCDF_writeOUTPUT(output_filename_day, "leaf_carbon_content", cleaf, tot_hour/24.0, step_nc_day)  
+          call netCDF_writeOUTPUT(output_filename_day, "root_carbon_content", croot, tot_hour/24.0, step_nc_day) 
+          call netCDF_writeOUTPUT(output_filename_day, "temperature_yasso", metyasso_roll(1), tot_hour/24.0, step_nc_day) 
+          call netCDF_writeOUTPUT(output_filename_day, "precipitation_yasso", metyasso_roll(2), tot_hour/24.0, step_nc_day) 
 
           step_nc_day= step_nc_day+1                
 
