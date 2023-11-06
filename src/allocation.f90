@@ -17,13 +17,16 @@ implicit none
 
    end type alloc_para_type
 
-   type, public :: management_para_type
+   type, public :: management_data_type
    !----------------------------
    ! management parameters
    !-----------------------------
-     real(8) :: cut_ratio          ! cutting ratio
-     real(8) :: graze_ratio        ! grazing ratio
-   end type management_para_type
+     integer :: management_type          ! management types
+     real(8) :: management_c_input       ! 
+     real(8) :: management_c_output      ! 
+     real(8) :: management_n_input       ! 
+     real(8) :: management_n_output      ! 
+   end type management_data_type
 
    public alloc_hypothesis_1    ! estimate litter input from gpp directly, fixed ratio
    public alloc_hypothesis_2    ! estimate litter input from npp -> above- & below- ground biomass, only management 
@@ -54,7 +57,7 @@ contains
 
    subroutine alloc_hypothesis_2(gpp_day, npp_day, auto_resp, croot, cleaf, cstem, litter_cleaf, litter_croot, &
                                   abovebiomass, belowbiomass, yield, &
-                                  lai, alloc_para, manage_para, pheno_stage, management_type)
+                                  lai, alloc_para, manage_data, pheno_stage)
 
       real(8), intent(in)    :: gpp_day      ! gpp (daily average),  kg C m-2 s-1
       real(8), intent(inout) :: npp_day      ! npp (daily average),  kg C m-2 s-1
@@ -69,8 +72,8 @@ contains
       real(8), intent(inout) :: belowbiomass ! Abovegroud biomass (kg dry mass m-2)
       real(8), intent(inout) :: yield        ! yield
       type(alloc_para_type), intent(inout) :: alloc_para   ! allometric parameters
-      type(management_para_type), intent(inout) :: manage_para   ! allometric parameters
-      integer, intent(in)    :: pheno_stage, management_type
+      type(management_data_type), intent(inout) :: manage_data   ! allometric parameters
+      integer, intent(in)    :: pheno_stage
 
       ! local
       real(8) :: litter_cstem ! carbon input with "stem" composition per day
@@ -90,7 +93,7 @@ contains
                                       ! storage carbon pool?
                                       ! Use reversed LAI (remote sensed) to leafc carbon to estimate litter?
 
-         if (management_type .eq. 0) then    ! no management, organic fertilizer, potential yields, Nitrogen (?) 
+         !if (manage_data%management_type .eq. 0) then    ! no management, organic fertilizer, potential yields, Nitrogen (?) 
            npp_day = gpp_day * (1-alloc_para%cratio_resp) * 3600 * 24
            auto_resp = gpp_day * alloc_para%cratio_resp * 3600 * 24
            litter_cleaf= cleaf * alloc_para%turnover_cleaf
@@ -99,24 +102,21 @@ contains
            cleaf   = cleaf + npp_day * alloc_para%cratio_leaf - litter_cleaf
            cstem   = cstem + npp_day * (1-alloc_para%cratio_leaf-alloc_para%cratio_root) - litter_cstem
            croot   = croot + npp_day * alloc_para%cratio_root - litter_croot
-         end if
+         !end if
 
-         if (management_type .eq. 1) then    ! cutting,  grass is special....
-            manage_para%cut_ratio = 0.8            
-            cleaf = (1-manage_para%cut_ratio) * cleaf
-            cstem = (1-manage_para%cut_ratio) * cstem
+         if (manage_data%management_type .eq. 1) then    ! harvesting,  grass is special....           
+            cleaf = cleaf - manage_data%management_c_output*3600*24*cleaf/(cleaf+cstem)
+            cstem = cstem - manage_data%management_c_output*3600*24*cstem/(cleaf+cstem)
             ! no litter input to soil
-         end if
-
-         if (management_type .eq. 2) then    ! grazing
-            manage_para%graze_ratio = 0.1
-            cleaf = (1-manage_para%graze_ratio) * cleaf
-            cstem = (1-manage_para%graze_ratio) * cstem
+         else if (manage_data%management_type .eq. 3) then    ! grazing
+            cleaf = cleaf + (manage_data%management_c_input - manage_data%management_c_output) &
+                                 *3600*24*cleaf/(cleaf+cstem)
+            cstem = cstem + (manage_data%management_c_input - manage_data%management_c_output) &
+                                 *3600*24*cstem/(cleaf+cstem)
             ! manure input
          end if
 
                                                
-
          litter_cleaf= litter_cleaf + litter_cstem ! combine leaf and stem together
       end if
 
@@ -127,7 +127,7 @@ contains
 
       ! yield        = abovebiomass * alloc_para%harvest_index                     
       lai          = cleaf/alloc_para%cratio_biomass * alloc_para%sla
-
+      
       !call cal_lai_from_leafc(lai, leafc)
 
    end subroutine alloc_hypothesis_2
