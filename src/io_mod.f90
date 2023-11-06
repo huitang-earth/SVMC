@@ -495,4 +495,35 @@ contains
 
   end subroutine netCDF_readsoilmoist
 
+
+  subroutine netCDF_readmanagement(filename, management_type, management_c_in, management_c_out, &
+                                            management_n_in, management_n_out, i)
+
+     use netcdf
+     implicit none
+
+     character(*), intent(in) :: filename
+     integer, intent(in)      :: i
+     integer, intent(out)     :: management_type
+     real(8), intent(out)     :: management_c_in, management_c_out, &
+                                 management_n_in, management_n_out
+
+     ! local variables:
+     integer, dimension(:,:,:), intent(out)     :: management_type_matrix
+     real(8), dimension(:,:,:), intent(out)     :: management_cin_matrix, management_cout_matrix, &
+                                                   management_nin_matrix, management_nout_matrix
+
+     call netCDF_readvar(filename, "management_type", management_type_matrix, i)
+     call netCDF_readvar(filename, "management_c_input", management_cin_matrix, i)
+     call netCDF_readvar(filename, "management_c_output", management_cout_matrix, i)
+     call netCDF_readvar(filename, "management_n_input", management_nin_matrix, i)
+     call netCDF_readvar(filename, "management_n_output", management_nout_matrix, i)
+     management_type=management_type_matrix(1,1,1)
+     management_c_in=management_cin_matrix(1,1,1)
+     management_c_out=management_cout_matrix(1,1,1)
+     management_n_in=management_nin_matrix(1,1,1)
+     management_n_out=management_nout_matrix(1,1,1)
+
+  end subroutine netCDF_readmanagement
+
 end module io_mod

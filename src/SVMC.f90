@@ -132,7 +132,7 @@ program SVMC
   type(soilcn_flux_type)        :: soilcn_flux
   type(yasso_para_type)         :: yasso_para
   type(alloc_para_type)         :: alloc_para
-  type(management_para_type)    :: manage_para
+  type(management_data_type)    :: manage_data
 
   !character(len=200)  ::
   !real,dimension(:,:), allocatable
@@ -258,7 +258,12 @@ program SVMC
               call soil_water_retention_curve(soilmoist, spafhy_para, psi_soil)
               step_soilmoist=step_soilmoist+1
             end if
-
+            
+            ! Read management information
+            call netCDF_readmanagement('../data/management_qvidja_2021.nc', manage_data%management_type, & 
+                            manage_data%management_c_input, manage_data%management_c_output, & 
+                            manage_data%management_n_input, manage_data%management_n_output, step_management)
+            step_management=step_management+1              
           end if
 
           ! Determine whether to read new climate variables
@@ -538,7 +543,7 @@ program SVMC
           !AutoResp=gpp_day*0.5*3600*24
           call alloc_hypothesis_2(gpp_day, npp_day, AutoResp, croot, cleaf, cstem, leaf_litter_c, root_litter_c, &
                                   above_biomass, below_biomass, yield, &
-                                  lai_alloc, alloc_para, manage_para, pheno_stage, management_type)
+                                  lai_alloc, alloc_para, manage_data, pheno_stage)
           
           leaf_litter_c_year = leaf_litter_c_year + leaf_litter_c
           root_litter_c_year = root_litter_c_year + root_litter_c
