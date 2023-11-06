@@ -414,6 +414,7 @@ program SVMC
           call netCDF_writeOUTPUT(output_filename_hr, "Profit", profit, tot_hour/24.0, step_nc_hr)
 
           !Use common unit [mm s-1] ≈ [kg H2O m-2 s-1] for flux
+          call netCDF_writeOUTPUT(output_filename_hr, "Qle", LE, tot_hour/24.0, step_nc_hr)
           call netCDF_writeOUTPUT(output_filename_hr, "Evap", canopywater_flux%ET/(time_step*3600.0), & 
                                       tot_hour/24.0, step_nc_hr)
           call netCDF_writeOUTPUT(output_filename_hr, "Transp", tr_spafhy*1e3/(time_step*3600.0), &
