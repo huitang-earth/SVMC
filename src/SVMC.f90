@@ -577,8 +577,8 @@ program SVMC
              soilcn_flux%input_nfract, soilcn_flux%ctend(1), soilcn_flux%ctend(2), &
              soilcn_flux%ctend(3), soilcn_flux%ctend(4), soilcn_flux%ctend(5), soilcn_flux%ntend
 
-          HeteroResp= sum(-soilcn_flux%ctend)
-          TotalResp=HeteroResp+AutoResp
+          HeteroResp= sum(-soilcn_flux%ctend)/24/3600  
+          TotalResp=HeteroResp+AutoResp/24/3600
           
           ! We could also put yasso here can do the daily calculation for NEE
           ! call yasso20_day()
@@ -597,6 +597,7 @@ program SVMC
           call netCDF_writeOUTPUT(output_filename_day, "TotLivBiom", above_biomass + below_biomass, tot_hour/24.0, step_nc_day)
           call netCDF_writeOUTPUT(output_filename_day, "leaf_carbon_content", cleaf, tot_hour/24.0, step_nc_day)  
           call netCDF_writeOUTPUT(output_filename_day, "root_carbon_content", croot, tot_hour/24.0, step_nc_day) 
+          call netCDF_writeOUTPUT(output_filename_day, "soil_carbon_content", sum(soilcn_state%cstate), tot_hour/24.0, step_nc_day) 
           call netCDF_writeOUTPUT(output_filename_day, "temperature_yasso", metyasso_roll(1), tot_hour/24.0, step_nc_day) 
           call netCDF_writeOUTPUT(output_filename_day, "precipitation_yasso", metyasso_roll(2), tot_hour/24.0, step_nc_day) 
 
