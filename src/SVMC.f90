@@ -112,7 +112,7 @@ program SVMC
   ! alloc variables
   real(8)    :: croot=0.0, cleaf=0.0, cstem=0.0
   real(8)    :: above_biomass, below_biomass, yield
-  integer    :: pheno_stage=1
+  integer    :: pheno_stage=1, num_gpp_day=0
 
   ! For soil water retention curve
  ! real(8) :: watsat      ! v/v saturate moisture
@@ -505,6 +505,8 @@ program SVMC
 
         if (ISNAN(gpp) .or. (gpp .lt. 0.0)) then
           gpp = 0.0
+        else 
+          num_gpp_day= num_gpp_day+1
         end if
         gpp_day=gpp_day + gpp
         
@@ -513,7 +515,12 @@ program SVMC
         !  gdd_sum= gdd_sum+temp_day/24.....
 
           temp_day=temp_day/24
-          gpp_day =gpp_day/24
+
+          if (num_gpp_day .eq. 0) then
+            gpp_day = 0.0
+          else
+            gpp_day = gpp_day/num_gpp_day
+          end if
 
           ! run Topmodel
           ! catchment average ground water recharge [m per unit area]
@@ -545,7 +552,7 @@ program SVMC
           !call alloc_hypothesis_1(gpp_day, npp_day,  leaf_litter_c, root_litter_c, alloc_para)
           !AutoResp=gpp_day*0.5*3600*24
           call alloc_hypothesis_2(gpp_day, npp_day, AutoResp, croot, cleaf, cstem, leaf_litter_c, root_litter_c, &
-                                  above_biomass, below_biomass, yield, &
+                                  compost, above_biomass, below_biomass, yield, &
                                   lai_alloc, alloc_para, manage_data, pheno_stage)
           
           leaf_litter_c_year = leaf_litter_c_year + leaf_litter_c
@@ -635,6 +642,7 @@ program SVMC
           gpp_day=0.0
           temp_day=0.0
           precip_day=0.0
+          num_gpp_day=0
 
         end if
 
