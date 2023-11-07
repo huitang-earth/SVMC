@@ -56,7 +56,7 @@ contains
    end subroutine alloc_hypothesis_1
 
    subroutine alloc_hypothesis_2(gpp_day, npp_day, auto_resp, croot, cleaf, cstem, litter_cleaf, litter_croot, &
-                                  abovebiomass, belowbiomass, yield, &
+                                  compost, abovebiomass, belowbiomass, yield, &
                                   lai, alloc_para, manage_data, pheno_stage)
 
       real(8), intent(in)    :: gpp_day      ! gpp (daily average),  kg C m-2 s-1
@@ -67,6 +67,7 @@ contains
       real(8), intent(inout) :: cstem        ! leaf carbon
       real, intent(inout) :: litter_cleaf ! carbon input with "leaf" composition per day
       real, intent(inout) :: litter_croot ! carbon input with "root" composition per day
+      real, intent(inout) :: compost      ! manure input (kg C m-2 s-1)
       real(8), intent(inout) :: lai          ! leaf area index
       real(8), intent(inout) :: abovebiomass ! Abovegroud biomass (kg dry mass m-2)
       real(8), intent(inout) :: belowbiomass ! Abovegroud biomass (kg dry mass m-2)
@@ -78,16 +79,16 @@ contains
       ! local
       real(8) :: litter_cstem ! carbon input with "stem" composition per day
 
-      alloc_para%cratio_resp    = 0.5
-      alloc_para%cratio_leaf    = 0.4    ! later season grass, more in root and straw
-      alloc_para%cratio_root    = 0.5
+      alloc_para%cratio_resp    = 0.4
+      alloc_para%cratio_leaf    = 0.8        !0.4    ! later season grass, more in root and straw
+      alloc_para%cratio_root    = 0.2
       alloc_para%harvest_index  = 0.5
-      alloc_para%cratio_biomass = 0.45
+      alloc_para%cratio_biomass = 0.42
       alloc_para%turnover_cleaf = 0.41/365 
       alloc_para%turnover_croot = 0.41/365  ! depend on phenological stage? scaled to NPP:NPPmax
-      alloc_para%sla            = 30    ! m2 kg-1         
+      alloc_para%sla            = 10    ! m2 kg-1         
                                         ! leaf area in cm2 produced g−1 leaf dry weight plant−1 (500)
-
+                                        ! derived from https://en.wikipedia.org/wiki/Specific_leaf_area
       if (pheno_stage .eq. 1) then    ! phenology more critic for cereal, sow, emergence, maturity, flower, grainfill
                                       ! temperature dependence can be good ...
                                       ! storage carbon pool?
@@ -96,9 +97,9 @@ contains
          !if (manage_data%management_type .eq. 0) then    ! no management, organic fertilizer, potential yields, Nitrogen (?) 
            npp_day = gpp_day * (1-alloc_para%cratio_resp) * 3600 * 24
            auto_resp = gpp_day * alloc_para%cratio_resp * 3600 * 24
-           litter_cleaf= cleaf * alloc_para%turnover_cleaf
-           litter_cstem= cstem * alloc_para%turnover_cleaf
-           litter_croot= croot * alloc_para%turnover_croot
+           litter_cleaf=cleaf * alloc_para%turnover_cleaf
+           litter_cstem=cstem * alloc_para%turnover_cleaf
+           litter_croot=croot * alloc_para%turnover_croot
            cleaf   = cleaf + npp_day * alloc_para%cratio_leaf - litter_cleaf
            cstem   = cstem + npp_day * (1-alloc_para%cratio_leaf-alloc_para%cratio_root) - litter_cstem
            croot   = croot + npp_day * alloc_para%cratio_root - litter_croot
@@ -109,13 +110,11 @@ contains
             cstem = cstem - manage_data%management_c_output*3600*24*cstem/(cleaf+cstem)
             ! no litter input to soil
          else if (manage_data%management_type .eq. 3) then    ! grazing
-            cleaf = cleaf + (manage_data%management_c_input - manage_data%management_c_output) &
-                                 *3600*24*cleaf/(cleaf+cstem)
-            cstem = cstem + (manage_data%management_c_input - manage_data%management_c_output) &
-                                 *3600*24*cstem/(cleaf+cstem)
+            cleaf = cleaf - manage_data%management_c_output*3600*24*cleaf/(cleaf+cstem)
+            cstem = cstem - manage_data%management_c_output*3600*24*cstem/(cleaf+cstem)
             ! manure input
+            compost= manage_data%management_c_input*3600*24 
          end if
-
                                                
          litter_cleaf= litter_cleaf + litter_cstem ! combine leaf and stem together
       end if
