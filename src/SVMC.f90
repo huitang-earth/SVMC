@@ -38,10 +38,11 @@ program SVMC
   ! Loop variables
   !***********************************
   integer         :: i, m
-  integer         :: step_nc_hr, step_nc_day, step_clim, step_lai, step_soilmoist
+  integer         :: step_nc_hr, step_nc_day, step_clim, step_lai, step_soilmoist, step_management
   real(kind=dp)   :: tot_hour, tot_hour_end, juldate, start_date, end_date
   real(8), dimension(1)     :: start_clim_time, end_clim_time
-  real(8)            :: start_clim_juldate,start_lai_juldate,start_soilmoist_juldate   
+  real(8)            :: start_clim_juldate,start_lai_juldate,start_soilmoist_juldate, start_manage_juldate
+                            
   real(8), dimension(1)    :: start_lai_time, end_lai_time 
   integer         :: ntim_clim, ntim_lai, ntim_out_hr, ntim_out_day
  
@@ -111,7 +112,7 @@ program SVMC
   ! alloc variables
   real(8)    :: croot=0.0, cleaf=0.0, cstem=0.0
   real(8)    :: above_biomass, below_biomass, yield
-  integer    :: pheno_stage=1, management_type=0
+  integer    :: pheno_stage=1
 
   ! For soil water retention curve
  ! real(8) :: watsat      ! v/v saturate moisture
@@ -204,11 +205,13 @@ program SVMC
   start_clim_juldate=juldate(20201231,233000)
   start_lai_juldate =juldate(20210101,000000)
   start_soilmoist_juldate =juldate(20210101,000000)
-  
+  start_manage_juldate =juldate(20210101,000000)
+
   ! step the starting time steps for reading input files
   step_clim = floor((start_date-start_clim_juldate)*24)+1
   step_lai  = floor(start_date-start_lai_juldate)+1
   step_soilmoist = floor(start_date-start_soilmoist_juldate)+1
+  step_management = floor(start_date-start_manage_juldate)+1
 
   !********* open file for writing SpaFHy test outputs
   open(99, file = 'logbook.txt', status = 'old')
