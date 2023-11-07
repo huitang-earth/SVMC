@@ -92,7 +92,7 @@ program SVMC
   real(8)    :: vcmax      !   Carboxylation capacity (umol/m2/s)
   real(8)    :: profit                  ! Net assimilation rate after accounting for costs
   real(8)    :: chi_jmax_lim      ! Analytical chi in the case of strong Jmax limitation
-  real(8)    :: gpp, gpp_day, npp_day
+  real(8)    :: gpp, gpp_day, npp_day, nee_day
   real(8)    :: tr_phydro   ! Transpiration estimated by p-hydro model
 
   ! spafhy variables
@@ -597,7 +597,7 @@ program SVMC
           
           ! We could also put yasso here can do the daily calculation for NEE
           ! call yasso20_day()
-          ! nee_day= .......
+          nee_day=TotalResp - gpp_day
 
           ! Write output for daily variables
           if(step_nc_day.eq.0)then
@@ -608,6 +608,8 @@ program SVMC
           call netCDF_writeOUTPUT(output_filename_day, "HeteroResp", HeteroResp, tot_hour/24.0, step_nc_day) 
           call netCDF_writeOUTPUT(output_filename_day, "AutoResp", AutoResp, tot_hour/24.0, step_nc_day)         
           call netCDF_writeOUTPUT(output_filename_day, "TotalResp", TotalResp, tot_hour/24.0, step_nc_day) 
+          call netCDF_writeOUTPUT(output_filename_day, "GPP", gpp_day, tot_hour/24.0, step_nc_day)
+          call netCDF_writeOUTPUT(output_filename_day, "NEE", nee_day, tot_hour/24.0, step_nc_day)
           call netCDF_writeOUTPUT(output_filename_day, "LAI", lai_alloc, tot_hour/24.0, step_nc_day) 
           call netCDF_writeOUTPUT(output_filename_day, "TotLivBiom", above_biomass + below_biomass, tot_hour/24.0, step_nc_day)
           call netCDF_writeOUTPUT(output_filename_day, "leaf_carbon_content", cleaf, tot_hour/24.0, step_nc_day)  
