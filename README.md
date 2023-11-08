@@ -3,24 +3,26 @@
 ## Compiling:
 
 - Go to `src` folder. Run the following command:
+```
+# For Puhti:  
+gmake -f Makefile_puhti
 
-`gmake -f Makefile`
-
+# For containers (docker or openshift)
+gmake -f Makefile_container
+```
 - The program **SVMC** will appear in the `src` folder.
-- Need to adapt the [library path](https://https://github.com/huitang-earth/SVMC/blob/9738c7a5dc576ad472d9b5fc4664d79b576b7891/src/Makefile#L16) and [include path](https://github.com/huitang-earth/SVMC/blob/9738c7a5dc576ad472d9b5fc4664d79b576b7891/src/Makefile#L8) of netcdf library when needed. 
+- Need to adapt the [library path](https://github.com/huitang-earth/SVMC/blob/f177abfb135c5111fdfd56436410c0f973d79f2b/src/Makefile_puhti#L16) and [include path](https://github.com/huitang-earth/SVMC/blob/f177abfb135c5111fdfd56436410c0f973d79f2b/src/Makefile_puhti#L8) of netcdf library when needed. 
 - Only **gfortran** is tested at the moment!
-- For compiling SVM on Puhti, need to load the modules. 
-`module load gcc/11.3.0 openmpi/4.1.4 netcdf-fortran/4.5.4`
- 
+
 ## Running the test (Qvidja, 2021) with phydro-spafhy
 
 `./SVMC`
 
 - To set the control parameters (e.g., input/output folders, running periods, time steps), please check `readctrl_mod.f90` at [here](https://github.com/huitang-earth/SVMC/blob/9738c7a5dc576ad472d9b5fc4664d79b576b7891/src/readctrl_mod.f90#L60-L72)
 - To set the parameters of p-hydro, please check `readvegpara_mod.f90` at [here](https://github.com/huitang-earth/SVMC/blob/9738c7a5dc576ad472d9b5fc4664d79b576b7891/src/readvegpara_mod.f90#L147-L161)
-- To set the parameters related spafhy, please check both `readvegpara_mod.f90` at [here](https://github.com/huitang-earth/SVMC/blob/9738c7a5dc576ad472d9b5fc4664d79b576b7891/src/readvegpara_mod.f90#L167-L192) and 'readsoilpara_mod.f90' at [here](https://github.com/huitang-earth/SVMC/blob/9738c7a5dc576ad472d9b5fc4664d79b576b7891/src/readsoilpara_mod.f90#L138-L155) here.
+- To set the parameters related spafhy, please check 'readsoilpara_mod.f90' at [here](https://github.com/huitang-earth/SVMC/blob/9738c7a5dc576ad472d9b5fc4664d79b576b7891/src/readsoilpara_mod.f90#L138-L155).
 - The input and output subroutines with netcdf are kept in `io_mod.f90`. If you want to add more output data into the output netcdf file, please define the variable [here](https://github.com/huitang-earth/SVMC/blob/9738c7a5dc576ad472d9b5fc4664d79b576b7891/src/io_mod.f90#L73-L198) in `io_mod.f90` and call the writing variable subroutine in `SVMC.f90`[here](https://github.com/huitang-earth/SVMC/blob/9738c7a5dc576ad472d9b5fc4664d79b576b7891/src/SVMC.f90#L316-L328). 
-- Input and Output are both kept in the `data` folder [here](https://github.com/huitang-earth/SVMC/tree/spafhy_test/data)
+- Input and Output are both kept in the `data` folder [here](https://github.com/huitang-earth/SVMC/tree/main/data)
 
 ## Additional notes:
 - Namelist files are implemented in the code, but have not be tested yet. So, **you need to change parameters in the code and re-compile the model** when doing testing. 
