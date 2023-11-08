@@ -212,8 +212,8 @@ contains
   ! Presetting namelist command
     soil_depth=0.4
     max_poros=0.46           ! should be equivalent to watsat here.
-    fc=0.36                   ! based on C3 in Launiainen et al. 2022 ! Must be computed from water-retention curve
-    wp=0.22                   ! Must be computed from water-retention curve
+    fc=0.42    !0.36                   ! based on C3 in Launiainen et al. 2022 ! Must be computed from water-retention curve
+    wp=0.26    !0.22                   ! Must be computed from water-retention curve
     ksat=2.0e-6
     !beta=4.7            ! default 
     org_depth=0.04
