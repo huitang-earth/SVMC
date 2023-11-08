@@ -1,4 +1,6 @@
 # SVMC
+[![FMI](docs/img/FMI_logo.jpg "Finnish Meteorological Institute")](https://en.ilmatieteenlaitos.fi/)
+[![LUKE](docs/img/Luke_logo.jpg "Natural Resources Institute Finland")](https://www.luke.fi/en)
 
 ## Compiling:
 
