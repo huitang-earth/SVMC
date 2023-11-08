@@ -38,10 +38,11 @@ program SVMC
   ! Loop variables
   !***********************************
   integer         :: i, m
-  integer         :: step_nc_hr, step_nc_day, step_clim, step_lai, step_soilmoist
+  integer         :: step_nc_hr, step_nc_day, step_clim, step_lai, step_soilmoist, step_management
   real(kind=dp)   :: tot_hour, tot_hour_end, juldate, start_date, end_date
   real(8), dimension(1)     :: start_clim_time, end_clim_time
-  real(8)            :: start_clim_juldate,start_lai_juldate,start_soilmoist_juldate   
+  real(8)            :: start_clim_juldate,start_lai_juldate,start_soilmoist_juldate, start_manage_juldate
+                            
   real(8), dimension(1)    :: start_lai_time, end_lai_time 
   integer         :: ntim_clim, ntim_lai, ntim_out_hr, ntim_out_day
  
@@ -91,7 +92,7 @@ program SVMC
   real(8)    :: vcmax      !   Carboxylation capacity (umol/m2/s)
   real(8)    :: profit                  ! Net assimilation rate after accounting for costs
   real(8)    :: chi_jmax_lim      ! Analytical chi in the case of strong Jmax limitation
-  real(8)    :: gpp, gpp_day, npp_day
+  real(8)    :: gpp, gpp_day, npp_day, nee_day
   real(8)    :: tr_phydro   ! Transpiration estimated by p-hydro model
 
   ! spafhy variables
@@ -103,7 +104,7 @@ program SVMC
   ! yasso variables
   real(8)    :: HeteroResp, AutoResp,TotalResp
   real(8)    :: leaf_litter_c, root_litter_c, soluble=0.0, compost=0.0
-  real(8)    :: leaf_litter_c_year, root_litter_c_year
+  real(8)    :: leaf_litter_c_year, root_litter_c_year, soluble_year=0.0, compost_year=0.0
   real(8)    :: metyasso_roll(2), metyasso(2)
   real(8)    :: metyasso_state(2,24*30+1)
   integer    :: metyasso_ind
@@ -111,7 +112,7 @@ program SVMC
   ! alloc variables
   real(8)    :: croot=0.0, cleaf=0.0, cstem=0.0
   real(8)    :: above_biomass, below_biomass, yield
-  integer    :: pheno_stage=1, management_type=0
+  integer    :: pheno_stage=1, num_gpp_day=0
 
   ! For soil water retention curve
  ! real(8) :: watsat      ! v/v saturate moisture
@@ -132,7 +133,7 @@ program SVMC
   type(soilcn_flux_type)        :: soilcn_flux
   type(yasso_para_type)         :: yasso_para
   type(alloc_para_type)         :: alloc_para
-  type(management_para_type)    :: manage_para
+  type(management_data_type)    :: manage_data
 
   !character(len=200)  ::
   !real,dimension(:,:), allocatable
@@ -204,11 +205,13 @@ program SVMC
   start_clim_juldate=juldate(20201231,233000)
   start_lai_juldate =juldate(20210101,000000)
   start_soilmoist_juldate =juldate(20210101,000000)
-  
+  start_manage_juldate =juldate(20210101,000000)
+
   ! step the starting time steps for reading input files
   step_clim = floor((start_date-start_clim_juldate)*24)+1
   step_lai  = floor(start_date-start_lai_juldate)+1
   step_soilmoist = floor(start_date-start_soilmoist_juldate)+1
+  step_management = floor(start_date-start_manage_juldate)+1
 
   !********* open file for writing SpaFHy test outputs
   open(99, file = 'logbook.txt', status = 'old')
@@ -219,7 +222,7 @@ program SVMC
                 &canopy_Interception,canopy_Throughfall,canopy_PotInfiltration,canopy_mbe,canopy_CanopyStorage,&
                 &LE,tr_phydro,gs,soil_Kh,Melt,Freeze,beta_SoilEvap,canopy_Unloading"
                 
-  open(999, file = 'yassodebug5.txt', status = 'old')
+  open(999, file = 'yassodebug.txt', status = 'old')
   write(999,*) "cstate1,cstate2, cstate3, cstate4, cstate5, nstate, &
               input_cfract1, input_cfract2, input_cfract3, input_cfract4, input_cfract5, input_nfract, &
               ctend1, ctend2, ctend3, ctend4, ctend5, ntend"
@@ -258,7 +261,12 @@ program SVMC
               call soil_water_retention_curve(soilmoist, spafhy_para, psi_soil)
               step_soilmoist=step_soilmoist+1
             end if
-
+            
+            ! Read management information
+            call netCDF_readmanagement('../data/management_qvidja_2021.nc', manage_data%management_type, & 
+                            manage_data%management_c_input, manage_data%management_c_output, & 
+                            manage_data%management_n_input, manage_data%management_n_output, step_management)
+            step_management=step_management+1              
           end if
 
           ! Determine whether to read new climate variables
@@ -414,30 +422,31 @@ program SVMC
           call netCDF_writeOUTPUT(output_filename_hr, "Profit", profit, tot_hour/24.0, step_nc_hr)
 
           !Use common unit [mm s-1] ≈ [kg H2O m-2 s-1] for flux
+          call netCDF_writeOUTPUT(output_filename_hr, "Qle", LE, tot_hour/24.0, step_nc_hr)
           call netCDF_writeOUTPUT(output_filename_hr, "Evap", canopywater_flux%ET/(time_step*3600.0), & 
                                       tot_hour/24.0, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "Transp", tr_spafhy*1e3/(time_step*3600.0), &
+          call netCDF_writeOUTPUT(output_filename_hr, "Transp", tr_spafhy/(time_step*3600.0), &
                                       tot_hour/24, step_nc_hr)
           call netCDF_writeOUTPUT(output_filename_hr, "CanopyEvap", canopywater_flux%CanopyEvap/(time_step*3600.0), &
                                       tot_hour/24.0, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "GroundEvap", canopywater_flux%GroundEvap/(time_step*3600.0), & 
+          call netCDF_writeOUTPUT(output_filename_hr, "GroundEvap", canopywater_flux%SoilEvap/(time_step*3600.0), & 
                                       tot_hour/24, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "Trfall", canopywater_flux%Trfall/(time_step*3600.0), &
+          call netCDF_writeOUTPUT(output_filename_hr, "Trfall", canopywater_flux%Throughfall/(time_step*3600.0), &
                                       tot_hour/24.0, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "CanopyInterc", canopywater_flux%Interc/(time_step*3600.0), &
+          call netCDF_writeOUTPUT(output_filename_hr, "CanopyInterc", canopywater_flux%Interception/(time_step*3600.0), &
                                       tot_hour/24, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "PotInf", canopywater_flux%PotInf/(time_step*3600.0), & 
+          call netCDF_writeOUTPUT(output_filename_hr, "PotInf", canopywater_flux%PotInfiltration/(time_step*3600.0), & 
                                       tot_hour/24.0, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "Unload", canopywater_flux%Unload/(time_step*3600.0), & 
+          call netCDF_writeOUTPUT(output_filename_hr, "Unload", canopywater_flux%Unloading/(time_step*3600.0), & 
                                       tot_hour/24.0, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "Roff", soilwater_flux%Roff*1e3/(time_step*3600.0), & 
+          call netCDF_writeOUTPUT(output_filename_hr, "Roff", soilwater_flux%Runoff /(time_step*3600.0), & 
                                       tot_hour/24.0, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "Drain", soilwater_flux%Drain*1e3/(time_step*3600.0), & 
+          call netCDF_writeOUTPUT(output_filename_hr, "Drain", soilwater_flux%Drainage/(time_step*3600.0), & 
                                       tot_hour/24.0, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "Inflow", soilwater_flux%Inflow*1e3/(time_step*3600.0), & 
+          call netCDF_writeOUTPUT(output_filename_hr, "Inflow", soilwater_flux%LateralFlow/(time_step*3600.0), & 
                                       tot_hour/24.0, step_nc_hr)
-          call netCDF_writeOUTPUT(output_filename_hr, "TopSoilInterc", soilwater_flux%Interc*1e3/(time_step*3600.0), & 
-                                      tot_hour/24.0, step_nc_hr)                    
+          !call netCDF_writeOUTPUT(output_filename_hr, "TopSoilInterc", soilwater_flux%Interc/(time_step*3600.0), & 
+          !                           tot_hour/24.0, step_nc_hr)                    
          
           !Use the units used by original spafhy: [m] for soil water storage, [mm] for canopy water storage
           call netCDF_writeOUTPUT(output_filename_hr, "WatSto", soilwater_state%WatSto, tot_hour/24.0, step_nc_hr)
@@ -496,6 +505,8 @@ program SVMC
 
         if (ISNAN(gpp) .or. (gpp .lt. 0.0)) then
           gpp = 0.0
+        else 
+          num_gpp_day= num_gpp_day+1
         end if
         gpp_day=gpp_day + gpp
         
@@ -504,7 +515,12 @@ program SVMC
         !  gdd_sum= gdd_sum+temp_day/24.....
 
           temp_day=temp_day/24
-          gpp_day =gpp_day/24
+
+          if (num_gpp_day .eq. 0) then
+            gpp_day = 0.0
+          else
+            gpp_day = gpp_day/num_gpp_day
+          end if
 
           ! run Topmodel
           ! catchment average ground water recharge [m per unit area]
@@ -536,8 +552,8 @@ program SVMC
           !call alloc_hypothesis_1(gpp_day, npp_day,  leaf_litter_c, root_litter_c, alloc_para)
           !AutoResp=gpp_day*0.5*3600*24
           call alloc_hypothesis_2(gpp_day, npp_day, AutoResp, croot, cleaf, cstem, leaf_litter_c, root_litter_c, &
-                                  above_biomass, below_biomass, yield, &
-                                  lai_alloc, alloc_para, manage_para, pheno_stage, management_type)
+                                  compost, above_biomass, below_biomass, yield, &
+                                  lai_alloc, alloc_para, manage_data, pheno_stage)
           
           leaf_litter_c_year = leaf_litter_c_year + leaf_litter_c
           root_litter_c_year = root_litter_c_year + root_litter_c
@@ -576,12 +592,12 @@ program SVMC
              soilcn_flux%input_nfract, soilcn_flux%ctend(1), soilcn_flux%ctend(2), &
              soilcn_flux%ctend(3), soilcn_flux%ctend(4), soilcn_flux%ctend(5), soilcn_flux%ntend
 
-          HeteroResp= sum(-soilcn_flux%ctend)
-          TotalResp=HeteroResp+AutoResp
+          HeteroResp= sum(-soilcn_flux%ctend)/24/3600  
+          TotalResp=HeteroResp+AutoResp/24/3600
           
           ! We could also put yasso here can do the daily calculation for NEE
           ! call yasso20_day()
-          ! nee_day= .......
+          nee_day=TotalResp - gpp_day
 
           ! Write output for daily variables
           if(step_nc_day.eq.0)then
@@ -589,24 +605,18 @@ program SVMC
             call netCDF_prepareOUTPUT(output_filename_day, lon_sites, lat_sites, ntim_out_day-1)
           end if
           
-          tmp_matrix(1,1,1)=HeteroResp
-          call netCDF_writeOUTPUT(output_filename_day, "HeteroResp", tmp_matrix, tot_hour/24.0, step_nc_day) 
-          tmp_matrix(1,1,1)=AutoResp
-          call netCDF_writeOUTPUT(output_filename_day, "AutoResp", tmp_matrix, tot_hour/24.0, step_nc_day)         
-          tmp_matrix(1,1,1)=TotalResp
-          call netCDF_writeOUTPUT(output_filename_day, "TotalResp", tmp_matrix, tot_hour/24.0, step_nc_day) 
-          tmp_matrix(1,1,1)=lai_alloc
-          call netCDF_writeOUTPUT(output_filename_day, "LAI", tmp_matrix, tot_hour/24.0, step_nc_day) 
-          tmp_matrix(1,1,1)=above_biomass + below_biomass
-          call netCDF_writeOUTPUT(output_filename_day, "TotLivBiom", tmp_matrix, tot_hour/24.0, step_nc_day)
-          tmp_matrix(1,1,1)=cleaf
-          call netCDF_writeOUTPUT(output_filename_day, "leaf_carbon_content", tmp_matrix, tot_hour/24.0, step_nc_day)  
-          tmp_matrix(1,1,1)=croot
-          call netCDF_writeOUTPUT(output_filename_day, "root_carbon_content", tmp_matrix, tot_hour/24.0, step_nc_day) 
-          tmp_matrix(1,1,1)=metyasso_roll(1)
-          call netCDF_writeOUTPUT(output_filename_day, "temperature_yasso", tmp_matrix, tot_hour/24.0, step_nc_day) 
-          tmp_matrix(1,1,1)=metyasso_roll(2)
-          call netCDF_writeOUTPUT(output_filename_day, "precipitation_yasso", tmp_matrix, tot_hour/24.0, step_nc_day) 
+          call netCDF_writeOUTPUT(output_filename_day, "HeteroResp", HeteroResp, tot_hour/24.0, step_nc_day) 
+          call netCDF_writeOUTPUT(output_filename_day, "AutoResp", AutoResp, tot_hour/24.0, step_nc_day)         
+          call netCDF_writeOUTPUT(output_filename_day, "TotalResp", TotalResp, tot_hour/24.0, step_nc_day) 
+          call netCDF_writeOUTPUT(output_filename_day, "GPP", gpp_day, tot_hour/24.0, step_nc_day)
+          call netCDF_writeOUTPUT(output_filename_day, "NEE", nee_day, tot_hour/24.0, step_nc_day)
+          call netCDF_writeOUTPUT(output_filename_day, "LAI", lai_alloc, tot_hour/24.0, step_nc_day) 
+          call netCDF_writeOUTPUT(output_filename_day, "TotLivBiom", above_biomass + below_biomass, tot_hour/24.0, step_nc_day)
+          call netCDF_writeOUTPUT(output_filename_day, "leaf_carbon_content", cleaf, tot_hour/24.0, step_nc_day)  
+          call netCDF_writeOUTPUT(output_filename_day, "root_carbon_content", croot, tot_hour/24.0, step_nc_day) 
+          call netCDF_writeOUTPUT(output_filename_day, "soil_carbon_content", sum(soilcn_state%cstate), tot_hour/24.0, step_nc_day) 
+          call netCDF_writeOUTPUT(output_filename_day, "temperature_yasso", metyasso_roll(1), tot_hour/24.0, step_nc_day) 
+          call netCDF_writeOUTPUT(output_filename_day, "precipitation_yasso", metyasso_roll(2), tot_hour/24.0, step_nc_day) 
 
           step_nc_day= step_nc_day+1                
 
@@ -634,13 +644,14 @@ program SVMC
           gpp_day=0.0
           temp_day=0.0
           precip_day=0.0
+          num_gpp_day=0
 
         end if
 
         if ((mod(tot_hour,24*365.0) .eq. 0).and.(tot_hour .gt. 0)) then
 
           call wrapper_yasso_initialize_flux(soilcn_flux)
-          call inputs_to_fractions(leaf_litter_c_year, root_litter_c_year, soluble, compost, soilcn_flux%input_cfract)
+          call inputs_to_fractions(leaf_litter_c_year, root_litter_c_year, soluble_year, compost_year, soilcn_flux%input_cfract)
           call wrapper_yasso_decompose(soilcn_state0, soilcn_flux, yasso_para, real(step_nc_day+1), &
                                                         temp_year/(tot_hour+1), precip_year)
 
@@ -660,10 +671,10 @@ program SVMC
        soilcn_state0%cstate(5), soilcn_state0%nstate, leaf_litter_c_year, root_litter_c_year, step_nc_day, &
        temp_year/step_nc_day, precip_year
 
-  call wrapper_yasso_initialize_flux(soilcn_flux)
-  call inputs_to_fractions(leaf_litter_c_year, root_litter_c_year, soluble, compost, soilcn_flux%input_cfract)
-  call wrapper_yasso_decompose(soilcn_state0, soilcn_flux, yasso_para, real(step_nc_day+1), &
-                                                      temp_year/(tot_hour), precip_year)
+  !call wrapper_yasso_initialize_flux(soilcn_flux)
+  !call inputs_to_fractions(leaf_litter_c_year, root_litter_c_year, soluble_year, compost_year, soilcn_flux%input_cfract)
+  !call wrapper_yasso_decompose(soilcn_state0, soilcn_flux, yasso_para, real(step_nc_day+1), &
+  !                                                   temp_year/(tot_hour), precip_year)
 
   write(99,'(*(G0.6,:,","))') & 
        soilcn_state0%cstate(1), soilcn_state0%cstate(2), soilcn_state0%cstate(3), soilcn_state0%cstate(4), & 

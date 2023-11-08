@@ -40,7 +40,7 @@ contains
     character    :: adate*8,atime*6,timeunit*32
     integer     :: nc_id, status
     integer :: londim_id, latdim_id, timedim_id,lonvar_id, latvar_id, timevar_id, &
-               pftdim_id, pftvar_id, gppvar_id, neevar_id, nppvar_id, trvar_id, arvar_id, &
+               pftdim_id, pftvar_id, gppvar_id, neevar_id, nppvar_id, qlevar_id, trvar_id, arvar_id, &
                hrvar_id, srvar_id, laivar_id, scvar_id, stvar_id, evvar_id, travar_id, &
                smvar_id, smpvar_id, cyvar_id, abvar_id, tbvar_id, lcvar_id, rcvar_id, fpvar_id, &
                namedim_id, jmvar_id, vcvar_id, dpsivar_id, chivar_id, provar_id, tempyasso_id, &
@@ -84,7 +84,8 @@ contains
     call check(nf90_def_var(nc_id, "soil_carbon_content", nf90_float, (/londim_id,latdim_id,timedim_id/), scvar_id))    
     call check(nf90_def_var(nc_id, "stomatal_conductance", nf90_float, (/londim_id,latdim_id,timedim_id/), stvar_id)) 
 
-    call check(nf90_def_var(nc_id, "Evap", nf90_float, (/londim_id,latdim_id,timedim_id/), evvar_id))   
+    call check(nf90_def_var(nc_id, "Qle", nf90_float, (/londim_id,latdim_id,timedim_id/), qlevar_id))
+    call check(nf90_def_var(nc_id, "Evap", nf90_float, (/londim_id,latdim_id,timedim_id/), evvar_id))  
     call check(nf90_def_var(nc_id, "Transp", nf90_float, (/londim_id,latdim_id,timedim_id/), travar_id))
     call check(nf90_def_var(nc_id, "CanopyEvap", nf90_float, (/londim_id,latdim_id,timedim_id/), cevvar_id))   
     call check(nf90_def_var(nc_id, "GroundEvap", nf90_float, (/londim_id,latdim_id,timedim_id/), gevvar_id))
@@ -175,6 +176,9 @@ contains
     call check(NF90_PUT_ATT(nc_id, stvar_id, "standard_name", "stomatal_conductance"))
     call check(NF90_PUT_ATT(nc_id, stvar_id, "long_name", "Stomatal Conductance"))
 
+    call check(NF90_PUT_ATT(nc_id, qlevar_id, "units", "W m-2"))
+    call check(NF90_PUT_ATT(nc_id, qlevar_id, "standard_name", "Latent heat flux"))
+    call check(NF90_PUT_ATT(nc_id, qlevar_id, "long_name", "Latent heat flux"))
     call check(NF90_PUT_ATT(nc_id, evvar_id, "units", "kg m-2 s-1"))
     call check(NF90_PUT_ATT(nc_id, evvar_id, "standard_name", "Evaporation"))
     call check(NF90_PUT_ATT(nc_id, evvar_id, "long_name", "Total Evaporation"))
@@ -490,5 +494,36 @@ contains
      call netCDF_readvar(filename, "SoilMoist", soilmoist, i)
 
   end subroutine netCDF_readsoilmoist
+
+
+  subroutine netCDF_readmanagement(filename, management_type, management_c_in, management_c_out, &
+                                            management_n_in, management_n_out, i)
+
+     use netcdf
+     implicit none
+
+     character(*), intent(in) :: filename
+     integer, intent(in)      :: i
+     integer, intent(out)     :: management_type
+     real(8), intent(out)     :: management_c_in, management_c_out, &
+                                 management_n_in, management_n_out
+
+     ! local variables:
+     real(8), dimension(1,1,1)     :: management_type_matrix
+     real(8), dimension(1,1,1)     :: management_cin_matrix, management_cout_matrix, &
+                                      management_nin_matrix, management_nout_matrix
+
+     call netCDF_readvar(filename, "management_type", management_type_matrix, i)
+     call netCDF_readvar(filename, "management_c_input", management_cin_matrix, i)
+     call netCDF_readvar(filename, "management_c_output", management_cout_matrix, i)
+     call netCDF_readvar(filename, "management_n_input", management_nin_matrix, i)
+     call netCDF_readvar(filename, "management_n_output", management_nout_matrix, i)
+     management_type=int(management_type_matrix(1,1,1))
+     management_c_in=management_cin_matrix(1,1,1)
+     management_c_out=management_cout_matrix(1,1,1)
+     management_n_in=management_nin_matrix(1,1,1)
+     management_n_out=management_nout_matrix(1,1,1)
+
+  end subroutine netCDF_readmanagement
 
 end module io_mod
