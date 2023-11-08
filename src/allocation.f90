@@ -100,6 +100,7 @@ contains
            litter_cleaf=cleaf * alloc_para%turnover_cleaf
            litter_cstem=cstem * alloc_para%turnover_cleaf
            litter_croot=croot * alloc_para%turnover_croot
+           compost=0.0
            cleaf   = cleaf + npp_day * alloc_para%cratio_leaf - litter_cleaf
            cstem   = cstem + npp_day * (1-alloc_para%cratio_leaf-alloc_para%cratio_root) - litter_cstem
            croot   = croot + npp_day * alloc_para%cratio_root - litter_croot
