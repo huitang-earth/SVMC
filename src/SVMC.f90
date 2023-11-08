@@ -104,7 +104,7 @@ program SVMC
   ! yasso variables
   real(8)    :: HeteroResp, AutoResp,TotalResp
   real(8)    :: leaf_litter_c, root_litter_c, soluble=0.0, compost=0.0
-  real(8)    :: leaf_litter_c_year, root_litter_c_year
+  real(8)    :: leaf_litter_c_year, root_litter_c_year, soluble_year=0.0, compost_year=0.0
   real(8)    :: metyasso_roll(2), metyasso(2)
   real(8)    :: metyasso_state(2,24*30+1)
   integer    :: metyasso_ind
@@ -651,7 +651,7 @@ program SVMC
         if ((mod(tot_hour,24*365.0) .eq. 0).and.(tot_hour .gt. 0)) then
 
           call wrapper_yasso_initialize_flux(soilcn_flux)
-          call inputs_to_fractions(leaf_litter_c_year, root_litter_c_year, soluble, compost, soilcn_flux%input_cfract)
+          call inputs_to_fractions(leaf_litter_c_year, root_litter_c_year, soluble_year, compost_year, soilcn_flux%input_cfract)
           call wrapper_yasso_decompose(soilcn_state0, soilcn_flux, yasso_para, real(step_nc_day+1), &
                                                         temp_year/(tot_hour+1), precip_year)
 
@@ -671,10 +671,10 @@ program SVMC
        soilcn_state0%cstate(5), soilcn_state0%nstate, leaf_litter_c_year, root_litter_c_year, step_nc_day, &
        temp_year/step_nc_day, precip_year
 
-  call wrapper_yasso_initialize_flux(soilcn_flux)
-  call inputs_to_fractions(leaf_litter_c_year, root_litter_c_year, soluble, compost, soilcn_flux%input_cfract)
-  call wrapper_yasso_decompose(soilcn_state0, soilcn_flux, yasso_para, real(step_nc_day+1), &
-                                                      temp_year/(tot_hour), precip_year)
+  !call wrapper_yasso_initialize_flux(soilcn_flux)
+  !call inputs_to_fractions(leaf_litter_c_year, root_litter_c_year, soluble_year, compost_year, soilcn_flux%input_cfract)
+  !call wrapper_yasso_decompose(soilcn_state0, soilcn_flux, yasso_para, real(step_nc_day+1), &
+  !                                                   temp_year/(tot_hour), precip_year)
 
   write(99,'(*(G0.6,:,","))') & 
        soilcn_state0%cstate(1), soilcn_state0%cstate(2), soilcn_state0%cstate(3), soilcn_state0%cstate(4), & 
