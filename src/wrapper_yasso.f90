@@ -243,8 +243,9 @@ subroutine readsoilyasso_namelist(yasso_para)
   subroutine exponential_smooth_met(met_daily, met_rolling, met_ind)
     ! Evaluate an expotential smoothing. used for scaling met
     ! parameters from daily to monthly level.
-    real, intent(in) :: met_daily(:)
-    real, intent(out) :: met_rolling(:)
+    ! https://en.wikipedia.org/wiki/Exponential_smoothing
+    real, intent(in) :: met_daily(:)         ! current meteorological data
+    real, intent(inout) :: met_rolling(:)    ! previous-step meteorological data
     integer, intent(inout) :: met_ind     ! a counter, must be 1 on first call, not changed outside
     ! local variables
     real           :: alpha_smooth=0.002
