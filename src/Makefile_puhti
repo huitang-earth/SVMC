@@ -36,6 +36,7 @@ lbfgsb.o \
 phydro_mod.o \
 water_mod.o \
 yasso.o \
+yassofortran20.o \
 wrapper_yasso.o \
 allocation.o  \
 juldate.o
