@@ -114,7 +114,9 @@ contains
             cleaf = cleaf - manage_data%management_c_output*3600*24*cleaf/(cleaf+cstem)
             cstem = cstem - manage_data%management_c_output*3600*24*cstem/(cleaf+cstem)
             ! manure input
-            compost= manage_data%management_c_input*3600*24 
+            compost= manage_data%management_c_input*3600*24
+         else if (manage_data%management_type .eq. 4) then    ! organic materials
+            litter_cleaf = litter_cleaf+manage_data%management_c_input*3600*24
          end if
                                                
          litter_cleaf= litter_cleaf + litter_cstem ! combine leaf and stem together
