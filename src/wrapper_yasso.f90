@@ -1,6 +1,7 @@
 module wrapper_yasso
 
   use yasso
+  use yasso20
 
   implicit none
 
@@ -240,11 +241,46 @@ subroutine readsoilyasso_namelist(yasso_para)
 
   end subroutine wrapper_yasso_decompose
 
+  subroutine wrapper_yasso_annual(soilcn_state, soilcn_flux, yasso_para, & 
+                       timestep_days, temp_mon, precip_year)
+    type(soilcn_state_type), intent(inout)    :: soilcn_state
+    type(soilcn_flux_type), intent(inout)    :: soilcn_flux
+    type(yasso_para_type), intent(in)    :: yasso_para
+    real, intent(in) :: timestep_days
+    real, dimension(12), intent(in) :: temp_mon ! air temperature
+    real, intent(in) :: precip_year ! precipitation mm / day
+
+    ! local variables
+    real ::  leac, d
+    real ::  days_yr
+    real ::  timestep_yr
+    real,dimension(5) :: cstate_next ! keep soil carbon state for the next time step
+    logical :: steadystate_pred ! switch to turn on steady-state assumption
+    
+    days_yr=365.0
+
+    timestep_yr = timestep_days / days_yr
+    leac=0.0  ! leaching unit?
+    d=0.0     ! size effect of wood debris on decomposition
+              ! for grass/crop this can be zero.
+    steadystate_pred=.False.  
+
+    call mod5c20(yasso_para%param_y20_map, timestep_yr, temp_mon, &
+                   precip_year, soilcn_state%cstate, soilcn_flux%input_cfract, d, &
+                   leac, cstate_next, steadystate_pred)
+    
+    soilcn_flux%ctend=cstate_next-(soilcn_state%cstate+soilcn_flux%input_cfract)
+    soilcn_state%cstate=cstate_next
+
+  end subroutine wrapper_yasso_annual
+
+
   subroutine exponential_smooth_met(met_daily, met_rolling, met_ind)
     ! Evaluate an expotential smoothing. used for scaling met
     ! parameters from daily to monthly level.
-    real, intent(in) :: met_daily(:)
-    real, intent(out) :: met_rolling(:)
+    ! https://en.wikipedia.org/wiki/Exponential_smoothing
+    real, intent(in) :: met_daily(:)         ! current meteorological data
+    real, intent(inout) :: met_rolling(:)    ! previous-step meteorological data
     integer, intent(inout) :: met_ind     ! a counter, must be 1 on first call, not changed outside
     ! local variables
     real           :: alpha_smooth=0.002
