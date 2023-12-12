@@ -308,7 +308,7 @@ program SVMC
           end if
 
           print *, "temp =", temp-273.15                  ! unit should be C
-          print *, "ppfd =", ppfd*1000000.0/lai          ! umol/m2/s, current unit is wrong
+          print *, "ppfd =", rg*2.1/lai !ppfd*1000000.0/lai          ! umol/m2/s, current unit is wrong
                                                          ! Averaging light absorption to each unit area of leaf (multi-layer leaf), 
                                                          !     multiply lai when calculating GPP
                                                          ! Alternatively, use total light absorption (one big leaf)
@@ -322,7 +322,7 @@ program SVMC
 
           
           ! for coupling with SpaFHy: psi_soil = soilwater_state%Psi
-          call pmodel_hydraulics_numerical(temp-273.15, ppfd*1000000.0/lai, vpd, co2*1000000, pres, fapar, &
+          call pmodel_hydraulics_numerical(temp-273.15, rg*2.1/lai, vpd, co2*1000000, pres, fapar, &
                                  psi_soil, rdark,                                                 &
                                  jmax, dpsi, gs, aj, ci, chi, vcmax, profit, chi_jmax_lim            &
                                  )
@@ -621,7 +621,7 @@ program SVMC
           end if
           
           call netCDF_writeOUTPUT(output_filename_day, "HeteroResp", HeteroResp, tot_hour/24.0, step_nc_day) 
-          call netCDF_writeOUTPUT(output_filename_day, "AutoResp", AutoResp, tot_hour/24.0, step_nc_day)         
+          call netCDF_writeOUTPUT(output_filename_day, "AutoResp", AutoResp/24/3600, tot_hour/24.0, step_nc_day)         
           call netCDF_writeOUTPUT(output_filename_day, "TotalResp", TotalResp, tot_hour/24.0, step_nc_day) 
           call netCDF_writeOUTPUT(output_filename_day, "GPP", gpp_day, tot_hour/24.0, step_nc_day)
           call netCDF_writeOUTPUT(output_filename_day, "NEE", nee_day, tot_hour/24.0, step_nc_day)
