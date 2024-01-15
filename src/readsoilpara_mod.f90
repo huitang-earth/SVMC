@@ -210,10 +210,10 @@ contains
 
     old=.false.
   ! Presetting namelist command
-    soil_depth=0.4
-    max_poros=0.46           ! should be equivalent to watsat here.
-    fc=0.42    !0.36                   ! based on C3 in Launiainen et al. 2022 ! Must be computed from water-retention curve
-    wp=0.26    !0.22                   ! Must be computed from water-retention curve
+    soil_depth=0.6
+    max_poros=0.54           ! should be equivalent to watsat here.
+    fc=0.40    !0.29  !0.42 (suggested by Jari-Pekka)    !0.36                   ! based on C3 in Launiainen et al. 2022 ! Must be computed from water-retention curve
+    wp=0.12    !0.09  !0.26 (suggested by Jari-Pekka)   !0.22                   ! Must be computed from water-retention curve
     ksat=2.0e-6
     !beta=4.7            ! default 
     org_depth=0.04
@@ -224,10 +224,10 @@ contains
     !rootzone_sat= 0.6 
     org_sat     = 1.0
     !pond_sto    = 0.0
-    n_van=1.07            !Launiainen et al. 2022: C1-5: 1.12, 1.14, 1.07, 1.27, 1.18 
+    n_van=1.14            !Launiainen et al. 2022: C1-5: 1.12, 1.14, 1.07, 1.27, 1.18 
     watres=0.0            !Launiainen et al. 2022: C1-5: 0.0
-    alpha_van=2.02          !Launiainen et al. 2022: C1-5: 4.45, 5.92, 2.02, 4.49, 3.35
-    watsat=0.46          !Launiainen et al. 2022: C1-5: 0.75, 0.68, 0.46, 0.47, 0.54  
+    alpha_van=5.92          !Launiainen et al. 2022: C1-5: 4.45, 5.92, 2.02, 4.49, 3.35
+    watsat=0.68          !Launiainen et al. 2022: C1-5: 0.75, 0.68, 0.46, 0.47, 0.54  
   
     wmax = 0.5      ! storage capacity for rain (mm/LAI), default: 1.5 too high? Hui: this is too much compared to CTSM
     wmaxsnow = 4.5  ! storage capacity for snow (mm/LAI), Hui: this is reasonable
