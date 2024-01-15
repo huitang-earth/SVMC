@@ -62,7 +62,7 @@ program SVMC
   real(8)     ::    co2       ! Atmospheric CO2 concentration (ppm)
   real(8)     ::    elv       ! Elevation above sea-level (m.a.s.l.) (not needed if we have surface pressure!)
   real(8)     ::    fapar     ! Fraction of absorbed photosynthetically active radiation (unitless) (will be calculated using LAI)
-  real(8)     ::    prec, precip_day, precip_year       ! 
+  real(8)     ::    prec, precip_day, melt_day, precip_year       ! 
   real(8)     ::    pres
   real(8)     ::    sh
   real(8)     ::    rh
@@ -190,6 +190,7 @@ program SVMC
   metyasso_ind=1
   temp_day=0.0
   precip_day=0.0
+  melt_day=0.0
   gpp_day=0.0
 
   temp_year=0.0
@@ -488,9 +489,7 @@ program SVMC
         ! HT: Currently, we use monthly rolling average for each hour calculation
         ! JV: compare annual balance with daily calculation
         metyasso(1)=temp-273.15
-        metyasso(2)=prec
-
-
+        metyasso(2)=prec+canopywater_flux%Melt/(time_step*3600.0)
       
         ! 30-day moving averaging 
         ! call average_met(metyasso, metyasso_roll, 24*30, &
@@ -685,6 +684,7 @@ program SVMC
           gpp_day=0.0
           temp_day=0.0
           precip_day=0.0
+          melt_day=0.0
           num_gpp_day=0
 
         end if
