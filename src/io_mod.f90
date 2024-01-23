@@ -495,6 +495,19 @@ contains
 
   end subroutine netCDF_readsoilmoist
 
+  subroutine netCDF_readsnow(filename, snowdepth, i)
+
+     use netcdf
+     implicit none
+
+
+     character(*), intent(in) :: filename
+     integer, intent(in)      :: i
+     real(8), dimension(:,:,:), intent (out)       :: snowdepth
+
+     call netCDF_readvar(filename, "SnowDepth", snowdepth, i)
+
+  end subroutine netCDF_readsnow
 
   subroutine netCDF_readmanagement(filename, management_type, management_c_in, management_c_out, &
                                             management_n_in, management_n_out, i)

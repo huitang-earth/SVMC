@@ -38,10 +38,10 @@ program SVMC
   ! Loop variables
   !***********************************
   integer         :: i, m
-  integer         :: step_nc_hr, step_nc_day, step_clim, step_lai, step_soilmoist, step_management
+  integer         :: step_nc_hr, step_nc_day, step_clim, step_lai, step_soilmoist, step_management, step_snowdepth
   real(kind=dp)   :: tot_hour, tot_hour_end, juldate, start_date, end_date
   real(8), dimension(1)     :: start_clim_time, end_clim_time
-  real(8)            :: start_clim_juldate,start_lai_juldate,start_soilmoist_juldate, start_manage_juldate
+  real(8)            :: start_clim_juldate,start_lai_juldate,start_soilmoist_juldate, start_manage_juldate, start_snowdepth_juldate,
                             
   real(8), dimension(1)    :: start_lai_time, end_lai_time 
   integer         :: ntim_clim, ntim_lai, ntim_out_hr, ntim_out_day
@@ -69,10 +69,10 @@ program SVMC
   real(8)     ::    wind
   real(8)     ::    rg, rn
   real(8)     ::    psi_soil, psi_soil_spafhy  ! soil water potential (Mpa)
-  real(8)     ::    soilmoist
+  real(8)     ::    soilmoist, snowdepth
   real(8)     ::    rdark     
 
-  real(8), dimension(1,1,1)  :: lai_matrix, soilmoist_matrix
+  real(8), dimension(1,1,1)  :: lai_matrix, soilmoist_matrix, snowdepth_matrix
   real(8), dimension(1,1,1)  :: temp_matrix, ppfd_matrix, rg_matrix, prec_matrix, &
                                 sh_matrix, rh_matrix, vpd_matrix, wind_matrix, &
                                 pres_matrix, co2_matrix, gpp_matrix, &
@@ -209,15 +209,17 @@ program SVMC
   call netCDF_readlonlat(input_climfile, num_sites, lat_sites, lon_sites)
 
   ! To simplify the time management, specify the julian start date of the inputdata by hand.
-  start_clim_juldate=juldate(20201231,233000)
-  start_lai_juldate =juldate(20210101,000000)
-  start_soilmoist_juldate =juldate(20210101,000000)
-  start_manage_juldate =juldate(20210101,000000)
+  start_clim_juldate=juldate(20181231,233000)
+  start_lai_juldate =juldate(20190101,000000)
+  start_soilmoist_juldate =juldate(20190101,000000)
+  start_snowdepth_juldate =juldate(20190101,000000)
+  start_manage_juldate =juldate(20190101,000000)
 
   ! step the starting time steps for reading input files
   step_clim = floor((start_date-start_clim_juldate)*24)+1
   step_lai  = floor(start_date-start_lai_juldate)+1
   step_soilmoist = floor(start_date-start_soilmoist_juldate)+1
+  step_snowdepth = floor(start_date-start_snowdepth_juldate)+1  
   step_management = floor(start_date-start_manage_juldate)+1
 
   !********* open file for writing SpaFHy test outputs
@@ -254,30 +256,45 @@ program SVMC
 
           if (mod(tot_hour,24.0) .eq. 0) then
             
+            print *, "check 0"
+            if (obs_snowdepth) then
+              call netCDF_readsnow(input_snowdepth, snowdepth_matrix, step_snowdepth)
+              snowdepth=snowdepth_matrix(1,1,1)               
+              step_snowdepth=step_snowdepth+1
+            end if
+
             if (obs_lai) then
               call netCDF_readlai(input_laifile, lai_matrix, step_lai)
-              lai=lai_matrix(1,1,1)
               step_lai=step_lai+1
+              if (snowdepth .lt. 0.0005) then
+                lai=lai_matrix(1,1,1)
+              else
+                lai=0.0
+              end if 
               ! calculate fapar:
               fapar= 1-exp(-k*lai)
             end if
-
+              
+            print *, "check 1"
             if (obs_soilmoist) then
-              call netCDF_readsoilmoist('../data/FieldObs_Qvidja.2021.soilmoist.nc', soilmoist_matrix, step_soilmoist)
+              call netCDF_readsoilmoist(input_soilmoist, soilmoist_matrix, step_soilmoist)
               soilmoist=soilmoist_matrix(1,1,1)               
               call soil_water_retention_curve(soilmoist, spafhy_para, psi_soil)
               step_soilmoist=step_soilmoist+1
             end if
             
+            print *, "check 2"
             ! Read management information
-            call netCDF_readmanagement('../data/management_qvidja_2021.nc', manage_data%management_type, & 
+            call netCDF_readmanagement(input_manage, manage_data%management_type, & 
                             manage_data%management_c_input, manage_data%management_c_output, & 
                             manage_data%management_n_input, manage_data%management_n_output, step_management)
             step_management=step_management+1              
+
           end if
 
           ! Determine whether to read new climate variables
           ! if () then
+          print *, "check 3"
           call netCDF_readClim(input_climfile, temp_matrix, ppfd_matrix, rg_matrix, prec_matrix, &
                        sh_matrix, rh_matrix, vpd_matrix, pres_matrix, &
                        co2_matrix, wind_matrix, step_clim)
@@ -359,7 +376,7 @@ program SVMC
           ! returns water fluxes integrated over time_step in units [mm = kg H2O m-2]
           call canopy_water_flux(rn, temp-273.15, prec, vpd, wind, pres, fapar, lai, &
                                   canopywater_state, canopywater_flux, soilwater_state, spafhy_para)
-
+        
           ! ET [mm]
           canopywater_flux%ET =  tr_phydro * (time_step*3600.0) +  canopywater_flux%SoilEvap + &
                                       canopywater_flux%CanopyEvap
