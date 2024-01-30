@@ -96,6 +96,39 @@ implicit none
     real(8) :: zo_ground 
   
   end type spafhy_para_type
+
+      ! local parameters
+    real(8) :: soil_depth    ! root zone depth (m)
+    real(8) :: max_poros     ! [m3 m-3], porosity
+    real(8) :: fc            ! [m3 m-3], field capacity. For consistency, must be computed from soil water retention curve at Psi= xx KPa
+    real(8) :: wp            ! [m3 m-3], wilting point. For consistency, must be computed from soil water retention curve at Psi=xx KPa
+    real(8) :: ksat          ! [m s-1], saturated hyd, conductivity
+    real(8) :: n_van       !Launiainen et al. 2022: C1-5: 1.12, 1.14, 1.07, 1.27, 1.18    
+    real(8) :: watres      !Launiainen et al. 2022: C1-5: 0.0
+    real(8) :: alpha_van   !Launiainen et al. 2022: C1-5: 4.45, 5.92, 2.02, 4.49, 3.35
+    real(8) :: watsat      !Launiainen et al. 2022: C1-5: 0.75, 0.68, 0.46, 0.47, 0.54  
+    real(8) :: org_depth     ! depth of organic top layer (m)
+    real(8) :: org_poros      ! porosity (-)
+    real(8) :: org_fc         ! field capacity (-)
+    real(8) :: org_sat        ! organic top layer saturation ratio (-)
+    !real(8) :: org_rw        ! critical vol. moisture content (-) for decreasing phase in Ef
+    real(8) :: maxpond        ! max ponding allowed (m)
+    
+    ! Canopy water parameters
+    real(8) :: wmax     ! storage capacity for rain (mm/LAI), Hui: this is too much compared to CTSM
+    real(8) :: wmaxsnow ! storage capacity for snow (mm/LAI), Hui: this is reasonable
+    real(8) :: hc       ! canopy height (m)
+    real(8) :: cf       ! canopy closure fraction (-)
+    real(8) :: w_leaf   ! leaf length scale (m)
+    real(8) :: rw       ! critical value for REW (-),
+    real(8) :: rwmin    ! minimum relative conductance (-)
+    real(8) :: gsoil    ! soil surface conductance if soil is fully wet (m/s)
+    real(8) :: kmelt         ! melt coefficient in open (mm/s)
+    real(8) :: kfreeze       ! freezing coefficient (mm/s)
+    real(8) :: frac_snowliq              ! r, maximum fraction of liquid in snow (-)
+    real(8) :: zmeas    
+    real(8) :: zground   
+    real(8) :: zo_ground 
   
   ! canopy interception
   ! real(8) :: kv = 0.4  ! von Karman constant (-) ! moved to spafhy_mod
@@ -141,39 +174,6 @@ contains
   
     type(spafhy_para_type), intent(inout)    :: spafhy_para
 
-    ! local parameters
-    real(8) :: soil_depth    ! root zone depth (m)
-    real(8) :: max_poros     ! [m3 m-3], porosity
-    real(8) :: fc            ! [m3 m-3], field capacity. For consistency, must be computed from soil water retention curve at Psi= xx KPa
-    real(8) :: wp            ! [m3 m-3], wilting point. For consistency, must be computed from soil water retention curve at Psi=xx KPa
-    real(8) :: ksat          ! [m s-1], saturated hyd, conductivity
-    real(8) :: n_van       !Launiainen et al. 2022: C1-5: 1.12, 1.14, 1.07, 1.27, 1.18    
-    real(8) :: watres      !Launiainen et al. 2022: C1-5: 0.0
-    real(8) :: alpha_van   !Launiainen et al. 2022: C1-5: 4.45, 5.92, 2.02, 4.49, 3.35
-    real(8) :: watsat      !Launiainen et al. 2022: C1-5: 0.75, 0.68, 0.46, 0.47, 0.54  
-    real(8) :: org_depth     ! depth of organic top layer (m)
-    real(8) :: org_poros      ! porosity (-)
-    real(8) :: org_fc         ! field capacity (-)
-    real(8) :: org_sat        ! organic top layer saturation ratio (-)
-    !real(8) :: org_rw        ! critical vol. moisture content (-) for decreasing phase in Ef
-    real(8) :: maxpond        ! max ponding allowed (m)
-    
-    ! Canopy water parameters
-    real(8) :: wmax     ! storage capacity for rain (mm/LAI), Hui: this is too much compared to CTSM
-    real(8) :: wmaxsnow ! storage capacity for snow (mm/LAI), Hui: this is reasonable
-    real(8) :: hc       ! canopy height (m)
-    real(8) :: cf       ! canopy closure fraction (-)
-    real(8) :: w_leaf   ! leaf length scale (m)
-    real(8) :: rw       ! critical value for REW (-),
-    real(8) :: rwmin    ! minimum relative conductance (-)
-    real(8) :: gsoil    ! soil surface conductance if soil is fully wet (m/s)
-    real(8) :: kmelt         ! melt coefficient in open (mm/s)
-    real(8) :: kfreeze       ! freezing coefficient (mm/s)
-    real(8) :: frac_snowliq              ! r, maximum fraction of liquid in snow (-)
-    real(8) :: zmeas    
-    real(8) :: zground   
-    real(8) :: zo_ground 
-
     logical :: old
     integer :: readerror
     integer,parameter :: unitsoilhydro=3
@@ -203,12 +203,14 @@ contains
       gsoil, &
       kmelt, &
       kfreeze, &
+      frac_snowliq, &
       zmeas, &
       zground, &
       zo_ground
 
 
     old=.false.
+
   ! Presetting namelist command
     soil_depth=0.6
     max_poros=0.54           ! should be equivalent to watsat here.
@@ -250,47 +252,47 @@ contains
     zo_ground = 0.01 
 
   ! Reading namelist
-  !  open(unitsoilhydro, file='./soilhydro_namelist', status='old', form='formatted', err=999)
-  !  read(unitsoilhydro, soilhydro_namelist, iostat=readerror)
-  !  close(unitsoilhydro)
-
-!999 write(*,*) ' #### MODEL ERROR! FILE "soilhydro_namelist"    #### '
-!    write(*,*) ' #### CANNOT BE OPENED IN THE DIRECTORY       #### '
-!    stop
-
-     spafhy_para%soil_depth=soil_depth
-     spafhy_para%max_poros=max_poros
-     spafhy_para%fc=fc
-     spafhy_para%wp=wp
-     spafhy_para%ksat=ksat
-     !spafhy_para%org_depth=org_depth
-     !spafhy_para%org_poros=org_poros
-     !spafhy_para%org_fc=org_fc
-     !spafhy_para%org_sat=org_sat
-     spafhy_para%maxpond=maxpond
-     spafhy_para%n_van=n_van
-     spafhy_para%watres=watres
-     spafhy_para%alpha_van=alpha_van
-     spafhy_para%watsat=watsat
+    open(unitsoilhydro, file='./soilhydro_namelist', status='old', form='formatted', err=999)
+    read(unitsoilhydro, soilhydro_namelist, iostat=readerror)
+    close(unitsoilhydro)
+    
+    spafhy_para%soil_depth=soil_depth
+    spafhy_para%max_poros=max_poros
+    spafhy_para%fc=fc
+    spafhy_para%wp=wp
+    spafhy_para%ksat=ksat
+    !spafhy_para%org_depth=org_depth
+    !spafhy_para%org_poros=org_poros
+    !spafhy_para%org_fc=org_fc
+    !spafhy_para%org_sat=org_sat
+    spafhy_para%maxpond=maxpond
+    spafhy_para%n_van=n_van
+    spafhy_para%watres=watres
+    spafhy_para%alpha_van=alpha_van
+    spafhy_para%watsat=watsat
      
-     spafhy_para%wmax=wmax
-     spafhy_para%wmaxsnow=wmaxsnow
-     spafhy_para%hc=hc
-     spafhy_para%w_leaf=w_leaf
-     spafhy_para%rw=rw
-     spafhy_para%rwmin=rwmin
-     spafhy_para%gsoil=gsoil
-     spafhy_para%kmelt=kmelt
-     spafhy_para%kfreeze=kfreeze
-     spafhy_para%frac_snowliq=frac_snowliq
-     spafhy_para%zmeas=zmeas
-     spafhy_para%zground=zground
-     spafhy_para%zo_ground=zo_ground
+    spafhy_para%wmax=wmax
+    spafhy_para%wmaxsnow=wmaxsnow
+    spafhy_para%hc=hc
+    spafhy_para%w_leaf=w_leaf
+    spafhy_para%rw=rw
+    spafhy_para%rwmin=rwmin
+    spafhy_para%gsoil=gsoil
+    spafhy_para%kmelt=kmelt
+    spafhy_para%kfreeze=kfreeze
+    spafhy_para%frac_snowliq=frac_snowliq
+    spafhy_para%zmeas=zmeas
+    spafhy_para%zground=zground
+    spafhy_para%zo_ground=zo_ground
+
+    return
+
+999 write(*,*) ' #### MODEL ERROR! FILE "soilhydro_namelist"    #### '
+    write(*,*) ' #### CANNOT BE OPENED IN THE DIRECTORY       #### '
+    stop
 
   end subroutine readsoilhydro_namelist
 
-
-  
 
 END MODULE readsoilpara_mod
 

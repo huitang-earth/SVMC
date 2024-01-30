@@ -33,8 +33,11 @@ MODULE readctrl_mod
   integer :: num_sites              ! This can be set by reading input file
   real(8), dimension(1)    :: lat_sites, lon_sites   ! This can be set by reading input file 
   real    :: time_step, time_step_output
-  character(len=256)  :: output_filename_day, output_filename_hr, input_climfile, input_laifile
-  logical :: obs_lai, obs_soilmoist
+  character(len=256)  :: output_dir, input_dir
+  character(len=256)  :: sites_name           ! need to be allocable.
+  logical :: obs_lai, obs_soilmoist, obs_snowdepth, yasso_year, &
+             phydro_debug, yasso_debug, water_debug
+  integer :: log_level
 
 contains
   !------------------------------------------------------
@@ -50,36 +53,49 @@ contains
     end_date_day, &
     end_date_hour, &
     num_sites, & 
-    input_climfile, &
-    input_laifile, &
+    sites_name, &
+    input_dir, &
+    output_dir, &
     time_step_output, &
-    output_filename_hr, &
     obs_lai, &
-    obs_soilmoist
+    obs_soilmoist, &
+    obs_snowdepth, &
+    yasso_year,  &
+    phydro_debug, &
+    yasso_debug, & 
+    water_debug, &
+    log_level
 
     old=.false.
     
     ! Presetting namelist command
-    start_date_day  =20210101 !20210601
+    start_date_day  =20190101 !20190601
     start_date_hour =000000
     time_step       =1               ! hours
-    end_date_day    =20211231 !
+    end_date_day    =20191231 !
     end_date_hour   =000000
     num_sites       =1                 ! number of sites, should also be read from input file?
+    sites_name      ='Qvidja'
     ! lon_sites     = (/ /)            ! longitude of sites (not needed, can be well defined input file)
     ! lat_sites     = (/ /)            ! latitude of sites (not needed, can be well defined by input file) 
-    input_climfile      ='../data/FieldObs_Qvidja.2021.hr.nc'         
-    input_laifile       ='../data/FieldObs_Qvidja.2021.lai.nc'
-    time_step_output=1.0
-    output_filename_day ='../data/test.nc' 
-    output_filename_hr ='../data/test_hr_2021_nolai_default_alpha0.08_gs_spafhy.nc' 
+    input_dir      ='../../SVMC/data/input'  
+    output_dir    ='../data/output'       
+    time_step_output    =1.0
     obs_lai=.true.
-    obs_soilmoist=.true.
+    obs_soilmoist=.false.
+    obs_snowdepth=.false.
+    yasso_year=.false.
+    phydro_debug=.false.
+    yasso_debug=.false.
+    water_debug=.false.
+    log_level=1
 
     ! Reading namelist
-    !open(unitcommand, file='./ctrl_namelist', status='old', form='formatted', err=999)
-    !read(unitcommand, ctrl_namelist, iostat=readerror)
-    !close(unitcommand)
+    open(unitcommand, file='./ctrl_namelist', status='old', form='formatted', err=999)
+    read(unitcommand, ctrl_namelist, iostat=readerror)
+    close(unitcommand)
+    
+    print *, "obs_snowdepth= ", obs_snowdepth
 
     if (time_step.eq.0) then
       write(*,*) ' #### MODEL ERROR! TIME STEP MUST    #### '
@@ -90,9 +106,9 @@ contains
 
     return
 
-!999   write(*,*) ' #### MODEL ERROR! FILE "ctrl_namelist"    #### '
-!    write(*,*) ' #### CANNOT BE OPENED IN THE DIRECTORY       #### '
-!    stop
+999   write(*,*) ' #### MODEL ERROR! FILE "ctrl_namelist"    #### '
+    write(*,*) ' #### CANNOT BE OPENED IN THE DIRECTORY       #### '
+    stop
 
   end subroutine readctrl_namelist
                    

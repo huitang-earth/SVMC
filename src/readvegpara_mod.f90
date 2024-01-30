@@ -93,14 +93,16 @@ contains
     opt_hypothesis= 'PM'          ! character, Either "LC" or "PM"     
 
   
-    ! Reading namelist
-   ! open(unitvegpara, file='./veg_namelist', status='old', form='formatted', err=999)
-    !read(unitvegpara,veg_namelist,iostat=readerror)
-    !close(unitvegpara)
+   ! Reading namelist
+    open(unitvegpara, file='./veg_namelist', status='old', form='formatted', err=999)
+    read(unitvegpara,veg_namelist,iostat=readerror)
+    close(unitvegpara)
 
-!999   write(*,*) ' #### MODEL ERROR! FILE "veg_namelist"    #### '
-!    write(*,*) ' #### CANNOT BE OPENED IN THE DIRECTORY       #### '
-!    stop
+    return
+
+999   write(*,*) ' #### MODEL ERROR! FILE "veg_namelist"    #### '
+    write(*,*) ' #### CANNOT BE OPENED IN THE DIRECTORY       #### '
+    stop
 
   end subroutine readvegpara_namelist
 
