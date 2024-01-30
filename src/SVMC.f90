@@ -230,7 +230,7 @@ program SVMC
 
   ! Here we assume all input files have time stamp starting from the beginning of the year
   ! In rare cases when the starting date of the input file is not the beginnig of the year, we need to manually adjust the date.
-  start_clim_juldate      =juldate(year_cur*10000+500+8,000000)
+  start_clim_juldate      =juldate(year_cur*10000+100+1,000000)
   start_lai_juldate       =juldate(year_cur*10000+100+1,000000)
   start_soilmoist_juldate =juldate(year_cur*10000+100+1,000000)
   start_snowdepth_juldate =juldate(year_cur*10000+100+1,000000)
