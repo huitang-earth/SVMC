@@ -242,23 +242,21 @@ subroutine readsoilyasso_namelist(yasso_para)
   end subroutine wrapper_yasso_decompose
 
   subroutine wrapper_yasso_annual(soilcn_state, soilcn_flux, yasso_para, & 
-                       timestep_days, temp_mon, precip_year)
+                       timestep_days, days_yr, temp_mon, precip_year)
     type(soilcn_state_type), intent(inout)    :: soilcn_state
     type(soilcn_flux_type), intent(inout)    :: soilcn_flux
     type(yasso_para_type), intent(in)    :: yasso_para
     real, intent(in) :: timestep_days
+    real, intent(in) :: days_yr
     real, dimension(12), intent(in) :: temp_mon ! air temperature
     real, intent(in) :: precip_year ! precipitation mm / day
 
     ! local variables
     real ::  leac, d
-    real ::  days_yr
     real ::  timestep_yr
     real,dimension(5) :: cstate_next ! keep soil carbon state for the next time step
     logical :: steadystate_pred ! switch to turn on steady-state assumption
     
-    days_yr=365.0
-
     timestep_yr = timestep_days / days_yr
     leac=0.0  ! leaching unit?
     d=0.0     ! size effect of wood debris on decomposition
