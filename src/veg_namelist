@@ -1,0 +1,10 @@
+&veg_namelist
+num_pft=1
+pft_type="grass"
+conductivity=3e-17
+psi50=-4
+b=2
+alpha=0.08
+gamma=1
+opt_hypothesis='PM'
+/

@@ -1,0 +1,29 @@
+&soilhydro_namelist
+ soil_depth=0.6
+ max_poros=0.68
+ fc=0.40
+ wp=0.12
+ ksat=2.0e-6
+ org_depth=0.04 
+ org_poros=0.9
+ org_fc=0.3 
+ maxpond=0.0
+ org_sat=1.0   
+ n_van=1.14     
+ watres=0.0
+ alpha_van=5.92
+ watsat=0.68
+ wmax=0.5
+ wmaxsnow=4.5
+ hc=0.6
+ w_leaf=0.01
+ rw=0.20
+ rwmin=0.02
+ gsoil=5e-3
+ kmelt=2.8934e-05
+ kfreeze=5.79e-6
+ frac_snowliq=0.05
+ zmeas=2.0
+ zground=0.1
+ zo_ground=0.01
+/
