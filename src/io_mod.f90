@@ -29,13 +29,14 @@ contains
     end if
   end subroutine check  
 
-  subroutine netCDF_prepareOUTPUT(filename, lon, lat, ntim)
+  subroutine netCDF_prepareOUTPUT(filename, start_day_file, start_hour_file, lon, lat, ntim)
     !Initialize a netCDF-file for emission fields
     use readctrl_mod
     use netcdf
     implicit none
 
     character(*), intent(in) :: filename
+    integer, intent(in) ::  start_day_file, start_hour_file
     character(80):: str_time
     character    :: adate*8,atime*6,timeunit*32
     integer     :: nc_id, status
@@ -54,9 +55,8 @@ contains
     real(8), dimension(1) :: lon
     real(8), dimension(1) :: lat
 
-    write(adate,'(i8.8)') start_date_day
-    write(atime,'(i6.6)') start_date_hour
-
+    write(adate,'(i8.8)') start_day_file
+    write(atime,'(i6.6)') start_hour_file
 
     call check(nf90_create(filename, cmode = NF90_HDF5, ncid = nc_id) )
      
@@ -495,6 +495,19 @@ contains
 
   end subroutine netCDF_readsoilmoist
 
+  subroutine netCDF_readsnow(filename, snowdepth, i)
+
+     use netcdf
+     implicit none
+
+
+     character(*), intent(in) :: filename
+     integer, intent(in)      :: i
+     real(8), dimension(:,:,:), intent (out)       :: snowdepth
+
+     call netCDF_readvar(filename, "SnowDepth", snowdepth, i)
+
+  end subroutine netCDF_readsnow
 
   subroutine netCDF_readmanagement(filename, management_type, management_c_in, management_c_out, &
                                             management_n_in, management_n_out, i)

@@ -388,21 +388,24 @@ contains
     ! resistance for snow sublimation adopted from:
     ! Pomeroy et al. 1998 Hydrol proc; Essery et al. 2003 J. Climate;
     ! Best et al. 2011 Geosci. Mod. Dev.
+   
+    if ( LAI > eps ) then
+      Ce = 0.01*((W + eps) / wmaxsnow_tot)**(-0.4)  ! exposure coeff (-)
+      Sh = (1.79 + 3.0*U**0.5)                      ! Sherwood numbner (-)
+      gi = Sh*W*Ce / 7.68 + eps                ! m s-1
 
-    Ce = 0.01*((W + eps) / wmaxsnow_tot)**(-0.4)  ! exposure coeff (-)
-    Sh = (1.79 + 3.0*U**0.5)                      ! Sherwood numbner (-)
-    gi = Sh*W*Ce / 7.68 + eps                ! m s-1
-
-    erate=0.0
-    if ((Prec == 0) .and. (T <= Tmin)) then
+      erate=0.0
+      if ((Prec == 0) .and. (T <= Tmin)) then
       ! sublimation
-      erate =  (time_step * 3600) / Ls * penman_monteith(AE, D, T, gi, Ga, P) ! mm in timestep
-    
-    else if ((Prec == 0) .and. (T > Tmin)) then
+        erate =  (time_step * 3600) / Ls * penman_monteith(AE, D, T, gi, Ga, P) ! mm in timestep    
+      else if ((Prec == 0) .and. (T > Tmin)) then
       ! evaporation
-      gs = 1e6   ! set to large number for free evaporation from wet surface
-      erate =  (time_step * 3600) / Lv * penman_monteith(AE, D, T, gs, Ga, P)  ! mm in timestep
-    end if 
+        gs = 1e6   ! set to large number for free evaporation from wet surface
+        erate =  (time_step * 3600) / Lv * penman_monteith(AE, D, T, gs, Ga, P)  ! mm in timestep
+      end if 
+    else
+      erate=0.0
+    end if
 
     if (T >= Tmin) then
       ! snow unloading from canopy, ensures also that seasonal LAI development does not mess up computations
@@ -414,11 +417,14 @@ contains
     !      based on: Hedstrom & Pomeroy 1998. Hydrol. Proc 12, 1611-1625;
     !                Koivusalo & Kokkonen 2002 J.Hydrol. 262, 145-164.
     if (T < Tmin) then
-      Interc = (wmaxsnow_tot - W) * (1.0 - exp(-Prec/wmaxsnow_tot))
-    
+      if (LAI > eps) then
+        Interc = (wmaxsnow_tot - W) * (1.0 - exp(-Prec/wmaxsnow_tot))
+      end if
     elseif (T >= Tmin) then    
     ! Above Tmin, interception capacity equals that of liquid precip
-      Interc = max(0.0, (wmax_tot - W)) * (1.0 - exp(-Prec/wmax_tot))
+      if (LAI > eps) then
+        Interc = max(0.0, (wmax_tot - W)) * (1.0 - exp(-Prec/wmax_tot))
+      end if
     end if
 
     ! update canopy storage after interception
@@ -500,6 +506,7 @@ contains
     real(8) :: zm1, zg1, alpha1, d, zom, zov, zosv, zn
     real(8) :: kv = 0.4  ! von Karman constant (-)
     real(8) :: beta_aero=285.0   ! s/m, from Campbell & Norman eq. (7.33) x 42.0 molm-3
+    real(8) :: eps = 1e-16
 
     zm1 = spafhy_para%hc + spafhy_para%zmeas  ! m
     zg1 = min(spafhy_para%zground, 0.1 * spafhy_para%hc)
@@ -519,8 +526,13 @@ contains
 
     ! canopy aerodynamic & boundary-layer resistances (sm-1). Magnani et al. 1998 PCE eq. B1 & B5
     !ra = 1. / (kv*ustar) * log((zm - d) / zom)
-    ra = 1./(kv**2.0 * Uo) * log((zm1-d)/zom) * log((zm1-d)/zov)    
-    rb = 1./LAI * beta_aero * ((spafhy_para%w_leaf / Uh)*(alpha1/(1.0-exp(-alpha1/2.0))))**0.5
+    ra = 1./(kv**2.0 * Uo) * log((zm1-d)/zom) * log((zm1-d)/zov)   
+
+    if (LAI > eps) then 
+      rb = 1./LAI * beta_aero * ((spafhy_para%w_leaf / Uh)*(alpha1/(1.0-exp(-alpha1/2.0))))**0.5
+    else
+      rb = 0.0
+    end if
 
     ! soil aerodynamic resistance (sm-1)
     ras = 1.0/(kv**2.0*Ug) * (log(spafhy_para%zground/spafhy_para%zo_ground))*log(spafhy_para%zground/(zosv))
