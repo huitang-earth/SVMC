@@ -519,11 +519,14 @@ program SVMC
           end if
             
           ! Read management information
+          if (obs_manage) then
           call netCDF_readmanagement(input_manage, manage_data%management_type, & 
                             manage_data%management_c_input, manage_data%management_c_output, & 
                             manage_data%management_n_input, manage_data%management_n_output, step_management)
           print *, "OK4"
           step_management=step_management+1              
+          end if
+
         end if
 
         ! Determine whether to read new climate variables

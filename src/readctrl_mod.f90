@@ -35,7 +35,7 @@ MODULE readctrl_mod
   real    :: time_step, time_step_output
   character(len=256)  :: output_dir, input_dir
   character(len=256)  :: sites_name           ! need to be allocable.
-  logical :: obs_lai, obs_soilmoist, obs_snowdepth, yasso_year, &
+  logical :: obs_lai, obs_soilmoist, obs_snowdepth, obs_manage, yasso_year, &
              phydro_debug, yasso_debug, water_debug
   integer :: log_level
 
@@ -60,6 +60,7 @@ contains
     obs_lai, &
     obs_soilmoist, &
     obs_snowdepth, &
+    obs_manage,  &
     yasso_year,  &
     phydro_debug, &
     yasso_debug, & 
@@ -84,6 +85,7 @@ contains
     obs_lai=.true.
     obs_soilmoist=.false.
     obs_snowdepth=.false.
+    obs_manage=.false.
     yasso_year=.false.
     phydro_debug=.false.
     yasso_debug=.false.
