@@ -423,7 +423,7 @@ program SVMC
           start_snowdepth_juldate =juldate(year_cur*10000+100+1,000000)
           start_manage_juldate =juldate(year_cur*10000+100+1,000000)
 
-          cur_date=year_cur*100000+mon_cur*100+day_cur
+          cur_date=year_cur*10000+mon_cur*100+day_cur
 
           ! step the starting time steps for reading input files
           !step_clim = floor((cur_date-start_clim_juldate)*24)+1
@@ -520,11 +520,11 @@ program SVMC
             
           ! Read management information
           if (obs_manage) then
-          call netCDF_readmanagement(input_manage, manage_data%management_type, & 
+            call netCDF_readmanagement(input_manage, manage_data%management_type, & 
                             manage_data%management_c_input, manage_data%management_c_output, & 
                             manage_data%management_n_input, manage_data%management_n_output, step_management)
-          print *, "OK4"
-          step_management=step_management+1              
+            print *, "OK4"
+            step_management=step_management+1           
           end if
 
         end if
