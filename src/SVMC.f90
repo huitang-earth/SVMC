@@ -524,7 +524,13 @@ program SVMC
                             manage_data%management_c_input, manage_data%management_c_output, & 
                             manage_data%management_n_input, manage_data%management_n_output, step_management)
             print *, "OK4"
-            step_management=step_management+1           
+            step_management=step_management+1
+          else
+            manage_data%management_type=0
+            manage_data%management_c_input=0.0
+            manage_data%management_c_output=0.0
+            manage_data%management_n_input=0.0
+            manage_data%management_n_output=0.0
           end if
 
         end if
