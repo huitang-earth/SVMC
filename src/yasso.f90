@@ -2,7 +2,7 @@ module yasso
 implicit none
 private
 
-real, parameter :: days_yr = 365.0
+real, parameter, public :: days_yr = 365.25
 integer, parameter, public :: statesize_yasso = 5
 
 ! The yasso parameter vector:
@@ -17,7 +17,7 @@ integer, parameter, public :: statesize_yasso = 5
 
 ! The Yasso20 maximum a posteriori parameters:
 integer, parameter, public :: num_params_y20 = 35
-real, parameter, public :: param_y20_map(num_params_y20) = (/ &
+real, public :: param_y20_map(num_params_y20) = (/ &
      0.51, &
      5.19, &
      0.13, &
@@ -56,20 +56,20 @@ real, parameter, public :: param_y20_map(num_params_y20) = (/ &
 
 ! Nitrogen-specific parameters
 !
-real, parameter, public :: nc_mb = 0.1 ! N-C ratio of the microbial biomass 
-real, parameter, public :: cue_min = 0.1 ! minimum microbial carbon use efficiency
+real, public :: nc_mb = 0.1 ! N-C ratio of the microbial biomass 
+real, public :: cue_min = 0.1 ! minimum microbial carbon use efficiency
 real, public :: nc_h_max = 0.1 ! N-C ratio of the H pool
 
 ! AWENH composition from Palosuo et al. (2015), for grasses. For now, we'll use the same
 ! composition for both above and below ground inputs. The last values (H) are always 0.
-real, parameter :: awenh_fineroot(statesize_yasso) = (/0.46, 0.32, 0.04, 0.18, 0.0/)
-real, parameter :: awenh_leaf(statesize_yasso) = (/0.46, 0.32, 0.04, 0.18, 0.0/)
+real, public :: awenh_fineroot(statesize_yasso) = (/0.46, 0.32, 0.04, 0.18, 0.0/)
+real, public :: awenh_leaf(statesize_yasso) = (/0.46, 0.32, 0.04, 0.18, 0.0/)
 ! A soil amendment consisting of soluble carbon (and nitrogen)
-real, parameter :: awenh_soluble(statesize_yasso) = (/0.0, 1.0, 0.0, 0.0, 0.0/)
+real, public :: awenh_soluble(statesize_yasso) = (/0.0, 1.0, 0.0, 0.0, 0.0/)
 ! From Heikkinen et al 2021, composted horse manure with straw litter
-real, parameter :: awenh_compost(statesize_yasso) = (/0.69, 0.09, 0.02, 0.20, 0.0/)
+real, public :: awenh_compost(statesize_yasso) = (/0.69, 0.09, 0.02, 0.20, 0.0/)
 
-integer, parameter, public :: met_ind_init = 1
+integer, public :: met_ind_init = 1
 
 public get_params
 public decompose
