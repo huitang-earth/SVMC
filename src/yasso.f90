@@ -2,7 +2,7 @@ module yasso
 implicit none
 private
 
-real, parameter, public :: days_yr = 365.25
+real, parameter :: days_yr = 365.25
 integer, parameter, public :: statesize_yasso = 5
 
 ! The yasso parameter vector:
