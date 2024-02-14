@@ -206,15 +206,18 @@ program SVMC
   write (year_str,'(I4)') year_cur         ! converting integer to string
   cur_date=start_date_day
 
+  hour_yr_num=(juldate((year_cur+1)*10000+100+1, 000000)- juldate(start_date_day, start_date_hour))*24
+
   ! Set up days in each month for calculating monthly averaged meteorological data.
+
   if (isleap(year_cur)) then
     month=(/31,60,91,121,152,182,213,244,274,305,335,366/)
     mon_daynum=(/31,29,31,30,31,30,31,31,30,31,30,31/)
-    hour_yr_num=366.0*24
+  !  hour_yr_num=366.0*24
   else
     month=(/31,59,90,120,151,181,212,243,273,304,334,365/)
     mon_daynum=(/31,28,31,30,31,30,31,31,30,31,30,31/)
-    hour_yr_num=365.0*24
+  !  hour_yr_num=365.0*24
   end if
 
   ! Need to determine if the end date is in the current year or not
