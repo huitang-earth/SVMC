@@ -37,6 +37,72 @@ implicit none
 
 contains
 
+   subroutine readalloc_namelist(alloc_para)
+  
+      type(alloc_para_type), intent(inout) :: alloc_para
+    
+      ! Local variables
+      real(8) :: cratio_resp         ! fraction of respiration to gpp
+      real(8) :: cratio_leaf         ! carbon ratio of leaf to npp
+      real(8) :: cratio_root         ! carbon ratio of root to npp
+      real(8) :: cratio_biomass      ! carbon ratio of biomass
+      real(8) :: harvest_index       !
+      real(8) :: turnover_cleaf      !
+      real(8) :: turnover_croot      !
+      real(8) :: sla                 ! specific leaf area, 
+
+      logical :: old
+      integer :: readerror
+      integer,parameter :: unitallocpara=5
+
+      namelist /alloc_namelist/ &
+       cratio_resp, &
+       cratio_leaf, &
+       cratio_root, &
+       cratio_biomass, &
+       harvest_index, &
+       turnover_cleaf, &
+       turnover_croot, &
+       sla
+
+      old=.false.
+
+      ! Default setting of allometric parameters
+      cratio_resp    = 0.4
+      cratio_leaf    = 0.8        !0.4    ! later season grass, more in root and straw
+      cratio_root    = 0.2
+      cratio_biomass = 0.42
+      harvest_index  = 0.5
+      turnover_cleaf = 0.41/365 
+      turnover_croot = 0.41/365  ! depend on phenological stage? scaled to NPP:NPPmax
+      sla            = 10    ! m2 kg-1     
+                             ! leaf area in cm2 produced g−1 leaf dry weight plant−1 (500)
+                             ! derived from https://en.wikipedia.org/wiki/Specific_leaf_area
+
+      ! Reading namelist
+      open(unitallocpara, file='./alloc_namelist', status='old', form='formatted', err=999)
+      read(unitallocpara,alloc_namelist,iostat=readerror)
+      close(unitallocpara)
+
+      print *, "harvest_index=", harvest_index
+
+      alloc_para%cratio_resp    = cratio_resp
+      alloc_para%cratio_leaf    = cratio_leaf
+      alloc_para%cratio_root    = cratio_root 
+      alloc_para%harvest_index  = harvest_index
+      alloc_para%cratio_biomass = cratio_biomass
+      alloc_para%turnover_cleaf = turnover_cleaf 
+      alloc_para%turnover_croot = turnover_croot
+      alloc_para%sla            = sla         
+
+      return
+
+999   write(*,*) ' #### MODEL ERROR! FILE "alloc_namelist"    #### '
+      write(*,*) ' #### CANNOT BE OPENED IN THE DIRECTORY       #### '
+      stop
+
+   end subroutine readalloc_namelist
+
    subroutine alloc_hypothesis_1(gpp_day, npp_day, litter_cleaf, litter_croot, alloc_para)
       real(8), intent(in)    :: gpp_day      ! gpp (daily average),  kg C m-2 s-1
       real(8), intent(inout) :: npp_day      ! npp (daily average),  kg C m-2 s-1
@@ -79,16 +145,6 @@ contains
       ! local
       real(8) :: litter_cstem ! carbon input with "stem" composition per day
 
-      alloc_para%cratio_resp    = 0.4
-      alloc_para%cratio_leaf    = 0.8        !0.4    ! later season grass, more in root and straw
-      alloc_para%cratio_root    = 0.2
-      alloc_para%harvest_index  = 0.5
-      alloc_para%cratio_biomass = 0.42
-      alloc_para%turnover_cleaf = 0.41/365 
-      alloc_para%turnover_croot = 0.41/365  ! depend on phenological stage? scaled to NPP:NPPmax
-      alloc_para%sla            = 10    ! m2 kg-1         
-                                        ! leaf area in cm2 produced g−1 leaf dry weight plant−1 (500)
-                                        ! derived from https://en.wikipedia.org/wiki/Specific_leaf_area
       if (pheno_stage .eq. 1) then    ! phenology more critic for cereal, sow, emergence, maturity, flower, grainfill
                                       ! temperature dependence can be good ...
                                       ! storage carbon pool?

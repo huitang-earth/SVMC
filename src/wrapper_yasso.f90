@@ -21,11 +21,11 @@ module wrapper_yasso
   !----------------------------
   ! Soil properties for yasso
   !-----------------------------
-     real(8) :: days_yr = 365.0
-     integer :: statesize_yasso = 5
+  !   real(8) :: days_yr = 365.0
+  !   integer :: statesize_yasso = 5
 
   ! The Yasso20 maximum a posteriori parameters:
-     integer  :: num_params_y20=35
+     !integer  :: num_params_y20=35
      real  :: param_y20_map(num_params_y20)
   
   ! Nitrogen-specific parameters
@@ -37,12 +37,9 @@ module wrapper_yasso
   ! composition for both above and below ground inputs. The last values (H) are always 0.
      real(8) :: awenh_fineroot(statesize_yasso)
      real(8) :: awenh_leaf(statesize_yasso)
-  
-  
-  ! A soil amendment consisting of soluble carbon (and nitrogen)
-  ! real :: awenh_soluble(statesize_yasso)
-  ! From Heikkinen et al 2021, composted horse manure with straw litter
-  ! real :: awenh_compost(statesize_yasso)
+     real(8) :: awenh_soluble(statesize_yasso)
+     real(8) :: awenh_compost(statesize_yasso)
+
      real :: flux_leafc_day   ! carbon input with "leaf" composition per day
      real :: flux_rootc_day   ! carbon input with "fineroot" composition per day
      real :: flux_nitr_day    ! organic nitrogen input per day
@@ -58,12 +55,11 @@ module wrapper_yasso
 
    ! initialized totc
      real :: totc   ! kg m2
-     real :: cn_input=50 !
-     real :: fract_root_input=0.5 
-     real :: fract_legacy_soc=0.0
+     real :: cn_input
+     real :: fract_root_input 
+     real :: fract_legacy_soc
 
-   end type yasso_para_type
-
+  end type yasso_para_type
 
 public readsoilyasso_namelist
 public wrapper_yasso_initialize
@@ -76,90 +72,77 @@ contains
 
 subroutine readsoilyasso_namelist(yasso_para)
 
-   type(yasso_para_type), intent(inout)  :: yasso_para
+  type(yasso_para_type), intent(inout)  :: yasso_para
 
-   logical :: old
-   integer :: readerror
-   integer,parameter :: unitsoilyasso=4
+  ! local parameters
+  logical :: old
+  integer :: readerror
+  integer,parameter :: unitsoilyasso=4
 
-   !namelist /soilyasso_namelist/ &
-   !    param_y20_map, &
-   !    nc_mb, &
-   !    cue_min, &
-   !    nc_h_max, &
-   !    awenh_fineroot, &
-   !    awenh_leaf
-!       awenh_soluble, &
-!       awenh_compost
-    
-    ! old=.false.
+  ! initialized totc, no predefined variables in yasso.f90, so have to declare and initialize here!
+  real :: tempr_c=5.0       ! celcius
+  real :: tempr_ampl=20     ! celcius
+  real :: precip_day=1.8    ! mm/day
+  real :: totc=16   ! kg m2
+  real :: cn_input=50 !
+  real :: fract_root_input=0.5 
+  real :: fract_legacy_soc=0.0
 
-  ! Presetting namelist command
-    yasso_para%param_y20_map(1:num_params_y20) = (/ &
-     0.51, &
-     5.19, &
-     0.13, &
-     0.1, &
-     0.5, &
-     0., &
-     1., &
-     1., &
-     0.99, &
-     0., &
-     0., &
-     0., &
-     0., &
-     0., &
-     0.163, &
-     0., &
-     -0., &
-     0., &
-     0., &
-     0., &
-     0., &
-     0.158, &
-     -0.002, &
-     0.17, &
-     -0.005, &
-     0.067, &
-     -0., &
-     -1.44, &
-     -2.0, &
-     -6.9, &
-     0.0042, &
-     0.0015, &
-     -2.55, &
-     1.24, &
-     0.25/)
+  namelist /soilyasso_namelist/ &
+    param_y20_map, &
+    nc_mb, &
+    cue_min, &
+    nc_h_max, &
+    awenh_fineroot, &
+    awenh_leaf, &
+    awenh_soluble, &
+    awenh_compost, &
+    tempr_c, &
+    tempr_ampl, &
+    precip_day, &
+    totc, &
+    cn_input, &
+    fract_root_input, &
+    fract_legacy_soc
 
-    yasso_para%nc_mb = 0.1
-    yasso_para%cue_min = 0.1
-    yasso_para%nc_h_max = 0.1
-    yasso_para%awenh_fineroot = (/0.46, 0.32, 0.04, 0.18, 0.0/)
-    yasso_para%awenh_leaf     = (/0.46, 0.32, 0.04, 0.18, 0.0/)
-
-    yasso_para%tempr_c=5.4
-    yasso_para%tempr_ampl=20
-    yasso_para%precip_day=697
-    yasso_para%totc=16.0
-    yasso_para%cn_input=50
-    yasso_para%fract_root_input=0.5
-    yasso_para%fract_legacy_soc=0.0
-
-!    awenh_soluble(statesize_yasso) = (/0.0, 1.0, 0.0, 0.0, 0.0/)
-!    awenh_compost(statesize_yasso) = (/0.69, 0.09, 0.02, 0.20, 0.0/)
+  old=.false.
 
   ! Reading namelist
-!    open(unitsoilyasso, file='./soilyasso_namelist', status='old', form='formatted', err=999)
-!    read(unitsoilyasso, soilyasso_namelist, iostat=readerror)
-!    close(unitsoilyasso)
+  open(unitsoilyasso, file='./soilyasso_namelist', status='old', form='formatted', err=999)
+  read(unitsoilyasso, soilyasso_namelist, iostat=readerror)
+  close(unitsoilyasso)
 
-!999 write(*,*) ' #### MODEL ERROR! FILE "soilyasso_namelist"    #### '
-!    write(*,*) ' #### CANNOT BE OPENED IN THE DIRECTORY       #### '
-!    stop
+  !print *, "param_y20_map= ", param_y20_map
+  !print *, "awenh_fineroot= ", awenh_fineroot
+  !print *, "awenh_compost= ", awenh_compost
+  print *, "fract_root_input= ", fract_root_input
+  print *, "precip_day= ", precip_day
 
+  ! Presetting namelist command
+  yasso_para%param_y20_map(1:num_params_y20) = param_y20_map
+  yasso_para%nc_mb = nc_mb
+  yasso_para%cue_min = cue_min
+  yasso_para%nc_h_max = nc_h_max
+  yasso_para%awenh_fineroot = awenh_fineroot
+  yasso_para%awenh_leaf     = awenh_leaf
+  yasso_para%awenh_soluble = awenh_soluble
+  yasso_para%awenh_compost = awenh_compost
+  
+  ! parameters for initialization
+  yasso_para%tempr_c=tempr_c
+  yasso_para%tempr_ampl=tempr_ampl
+  yasso_para%precip_day=precip_day
+  yasso_para%totc=totc
+  yasso_para%cn_input=cn_input
+  yasso_para%fract_root_input=fract_root_input
+  yasso_para%fract_legacy_soc=fract_legacy_soc
+
+  return
+
+999 write(*,*) ' #### MODEL ERROR! FILE "soilyasso_namelist"    #### '
+    write(*,*) ' #### CANNOT BE OPENED IN THE DIRECTORY       #### '
+    stop
   end subroutine readsoilyasso_namelist
-
 
   subroutine wrapper_yasso_initialize(soilcn_state, yasso_para)
    

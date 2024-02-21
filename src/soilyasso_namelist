@@ -1,0 +1,17 @@
+&soilyasso_namelist
+ ! param_y20_map=0.51, 5.19, 0.13, 0.1, 0.5, 0., 1., 1., 0.99, 0., 0., 0., 0., 0., 0.163, 0., 0., 0., 0., 0., 0., 0.158, -0.002, 0.17, -0.005, 0.067, 0.0, -1.44, -2.0, -6.9, 0.0042, 0.0015, -2.55, 1.24, 0.20
+ ! nc_mb=0.2
+ ! cue_min=0.1
+ ! nc_h_max=0.1
+ awenh_fineroot=0.46, 0.32, 0.04, 0.18, 0.0
+ awenh_leaf=0.46, 0.32, 0.04, 0.18, 0.0
+ awenh_soluble=0.0, 1.0, 0.0, 0.0, 0.0
+ awenh_compost=0.69, 0.09, 0.02, 0.20, 0.0
+ tempr_c=5.4
+ tempr_ampl=20
+ precip_day=1.87
+ totc=16.0
+ !cn_input=50
+ fract_root_input=0.6
+ fract_legacy_soc=0.0
+/ 

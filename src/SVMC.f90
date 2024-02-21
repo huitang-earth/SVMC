@@ -206,15 +206,18 @@ program SVMC
   write (year_str,'(I4)') year_cur         ! converting integer to string
   cur_date=start_date_day
 
+  hour_yr_num=(juldate((year_cur+1)*10000+100+1, 000000)- juldate(start_date_day, start_date_hour))*24
+
   ! Set up days in each month for calculating monthly averaged meteorological data.
+
   if (isleap(year_cur)) then
     month=(/31,60,91,121,152,182,213,244,274,305,335,366/)
     mon_daynum=(/31,29,31,30,31,30,31,31,30,31,30,31/)
-    hour_yr_num=366.0*24
+  !  hour_yr_num=366.0*24
   else
     month=(/31,59,90,120,151,181,212,243,273,304,334,365/)
     mon_daynum=(/31,28,31,30,31,30,31,31,30,31,30,31/)
-    hour_yr_num=365.0*24
+  !  hour_yr_num=365.0*24
   end if
 
   ! Need to determine if the end date is in the current year or not
@@ -423,7 +426,7 @@ program SVMC
           start_snowdepth_juldate =juldate(year_cur*10000+100+1,000000)
           start_manage_juldate =juldate(year_cur*10000+100+1,000000)
 
-          cur_date=year_cur*100000+mon_cur*100+day_cur
+          cur_date=year_cur*10000+mon_cur*100+day_cur
 
           ! step the starting time steps for reading input files
           !step_clim = floor((cur_date-start_clim_juldate)*24)+1
@@ -519,11 +522,20 @@ program SVMC
           end if
             
           ! Read management information
-          call netCDF_readmanagement(input_manage, manage_data%management_type, & 
+          if (obs_manage) then
+            call netCDF_readmanagement(input_manage, manage_data%management_type, & 
                             manage_data%management_c_input, manage_data%management_c_output, & 
                             manage_data%management_n_input, manage_data%management_n_output, step_management)
-          print *, "OK4"
-          step_management=step_management+1              
+            print *, "OK4"
+            step_management=step_management+1
+          else
+            manage_data%management_type=0
+            manage_data%management_c_input=0.0
+            manage_data%management_c_output=0.0
+            manage_data%management_n_input=0.0
+            manage_data%management_n_output=0.0
+          end if
+
         end if
 
         ! Determine whether to read new climate variables

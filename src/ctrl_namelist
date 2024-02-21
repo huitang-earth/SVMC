@@ -12,6 +12,7 @@ time_step_output=1.0
 obs_lai=.true.
 obs_soilmoist=.false.
 obs_snowdepth=.true.
+obs_manage=.true.
 yasso_year=.false.
 phydro_debug=.false.
 yasso_debug=.true.
