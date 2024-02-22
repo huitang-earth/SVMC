@@ -163,6 +163,7 @@ program SVMC
 
   call readsoilhydro_namelist(spafhy_para)
   call readsoilyasso_namelist(yasso_para)
+  call readalloc_namelist(alloc_para)
   
   !call set_soilwaterState(soilwater_state, canopywater_state)
   call initialization_spafhy(canopywater_state, soilwater_state, spafhy_para)
