@@ -6,14 +6,15 @@ implicit none
    !----------------------------
    ! allometric parameters
    !-----------------------------
-     real(8) :: cratio_resp         ! fraction of respiration to gpp
+     real(8) :: cratio_resp         ! fraction of respiration to gpp at 20 degree
      real(8) :: cratio_leaf         ! carbon ratio of leaf to npp
      real(8) :: cratio_root         ! carbon ratio of root to npp
      real(8) :: cratio_biomass      ! carbon ratio of biomass
      real(8) :: harvest_index       !
-     real(8) :: turnover_cleaf      !
-     real(8) :: turnover_croot      !
+     real(8) :: turnover_cleaf      ! turnover rate of leaf at 20 degree
+     real(8) :: turnover_croot      ! turnover rate of root at 20 degree
      real(8) :: sla                 ! specific leaf area, 
+     real(8) :: q10                 ! Q10 temperature coefficient (https://en.wikipedia.org/wiki/Q10_(temperature_coefficient))              
 
    end type alloc_para_type
 
@@ -50,6 +51,7 @@ contains
       real(8) :: turnover_cleaf      !
       real(8) :: turnover_croot      !
       real(8) :: sla                 ! specific leaf area, 
+      real(8) :: q10                 ! Q10 temperature coefficient 
 
       logical :: old
       integer :: readerror
@@ -63,7 +65,8 @@ contains
        harvest_index, &
        turnover_cleaf, &
        turnover_croot, &
-       sla
+       sla, &
+       q10
 
       old=.false.
 
@@ -78,6 +81,7 @@ contains
       sla            = 10    ! m2 kg-1     
                              ! leaf area in cm2 produced g−1 leaf dry weight plant−1 (500)
                              ! derived from https://en.wikipedia.org/wiki/Specific_leaf_area
+      q10            = 1     ! Commonly used in models
 
       ! Reading namelist
       open(unitallocpara, file='./alloc_namelist', status='old', form='formatted', err=999)
@@ -93,7 +97,8 @@ contains
       alloc_para%cratio_biomass = cratio_biomass
       alloc_para%turnover_cleaf = turnover_cleaf 
       alloc_para%turnover_croot = turnover_croot
-      alloc_para%sla            = sla         
+      alloc_para%sla            = sla
+      alloc_para%q10            = q10
 
       return
 
@@ -121,10 +126,11 @@ contains
 
    end subroutine alloc_hypothesis_1
 
-   subroutine alloc_hypothesis_2(gpp_day, npp_day, auto_resp, croot, cleaf, cstem, litter_cleaf, litter_croot, &
+   subroutine alloc_hypothesis_2(temp_day, gpp_day, npp_day, auto_resp, croot, cleaf, cstem, litter_cleaf, litter_croot, &
                                   compost, abovebiomass, belowbiomass, yield, &
                                   lai, alloc_para, manage_data, pheno_stage)
 
+      real(8), intent(in)    :: temp_day     ! temperature (exponentially averaged),  celcius degree
       real(8), intent(in)    :: gpp_day      ! gpp (daily average),  kg C m-2 s-1
       real(8), intent(inout) :: npp_day      ! npp (daily average),  kg C m-2 s-1
       real(8), intent(inout) :: auto_resp      ! npp (daily average),  kg C m-2 s-1
@@ -151,11 +157,13 @@ contains
                                       ! Use reversed LAI (remote sensed) to leafc carbon to estimate litter?
 
          !if (manage_data%management_type .eq. 0) then    ! no management, organic fertilizer, potential yields, Nitrogen (?) 
-           npp_day = gpp_day * (1-alloc_para%cratio_resp) * 3600 * 24
-           auto_resp = gpp_day * alloc_para%cratio_resp * 3600 * 24
-           litter_cleaf=cleaf * alloc_para%turnover_cleaf
-           litter_cstem=cstem * alloc_para%turnover_cleaf
-           litter_croot=croot * alloc_para%turnover_croot
+           npp_day = gpp_day * (1-alloc_para%cratio_resp * alloc_para%q10 ** ((temp_day - 20)/10)) * 3600 * 24
+           auto_resp = gpp_day * (alloc_para%cratio_resp) * alloc_para%q10 ** ((temp_day - 20)/10) * 3600 * 24
+
+
+           litter_cleaf=cleaf * alloc_para%turnover_cleaf * alloc_para%q10 ** ((temp_day  - 20)/10)
+           litter_cstem=cstem * alloc_para%turnover_cleaf * alloc_para%q10 ** ((temp_day  - 20)/10)
+           litter_croot=croot * alloc_para%turnover_croot * alloc_para%q10 ** ((temp_day  - 20)/10)
            compost=0.0
            cleaf   = cleaf + npp_day * alloc_para%cratio_leaf - litter_cleaf
            cstem   = cstem + npp_day * (1-alloc_para%cratio_leaf-alloc_para%cratio_root) - litter_cstem

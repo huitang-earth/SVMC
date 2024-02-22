@@ -811,7 +811,7 @@ program SVMC
         
           !call alloc_hypothesis_1(gpp_day, npp_day,  leaf_litter_c, root_litter_c, alloc_para)
           !AutoResp=gpp_day*0.5*3600*24
-          call alloc_hypothesis_2(gpp_day, npp_day, AutoResp, croot, cleaf, cstem, leaf_litter_c, root_litter_c, &
+          call alloc_hypothesis_2(temp_day, gpp_day, npp_day, AutoResp, croot, cleaf, cstem, leaf_litter_c, root_litter_c, &
                                   compost, above_biomass, below_biomass, yield, &
                                   lai_alloc, alloc_para, manage_data, pheno_stage)
           
