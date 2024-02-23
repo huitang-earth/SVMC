@@ -74,8 +74,8 @@ program SVMC
   real(8)     ::    wind
   real(8)     ::    rg, rn
   real(8)     ::    psi_soil, psi_soil_spafhy  ! soil water potential (Mpa)
-  real(8)     ::    soilmoist, snowdepth
-  real(8)     ::    rdark     
+  real(8)     ::    soilmoist, snowdepth   
+  real(8)     ::    leaf_rdark_day          ! daily averaged leaf dark respiration rate (kg C m-2 s-1)
 
   real(8), dimension(1,1,1)  :: lai_matrix, soilmoist_matrix, snowdepth_matrix
   real(8), dimension(1,1,1)  :: temp_matrix, ppfd_matrix, rg_matrix, prec_matrix, &
@@ -95,7 +95,7 @@ program SVMC
   real(8)    :: aj         ! electron-transport limited assimilation rate (umol/m2/s)
   real(8)    :: ci         !  leaf-internal CO2 concentration, converted to partial pressure (Pa)
   real(8)    :: chi        ! Optimal ratio of leaf internal to ambient CO2 (unitless).
-  real(8)    :: vcmax      !   Carboxylation capacity (umol/m2/s)
+  real(8)    :: vcmax, vcmax_day      !   Carboxylation capacity (umol/m2/s)
   real(8)    :: profit                  ! Net assimilation rate after accounting for costs
   real(8)    :: chi_jmax_lim      ! Analytical chi in the case of strong Jmax limitation
   real(8)    :: gpp, gpp_day, npp_day, nee_day
@@ -186,6 +186,7 @@ program SVMC
   precip_day=0.0
   melt_day=0.0
   gpp_day=0.0
+  vcmax_day=0.0
 
   !***********************************
   ! Set time control parameters
@@ -563,7 +564,6 @@ program SVMC
         ! run phydro to estimate photosynthetic rate (a) and stomatal conductance (gs)
         ! At what time scale the optimization should work need to be tested!!!!
         
-        rdark=0.0
         if(.not. obs_soilmoist) then
           !psi_soil = -1.0
           psi_soil = soilwater_state%Psi !root zone, MPa
@@ -590,9 +590,9 @@ program SVMC
                                  psi_soil, rdark,                                                &
                                  jmax, dpsi, gs, aj, ci, chi, vcmax, profit, chi_jmax_lim        &
                                  )
-          
+
         ! HT: need to multiply lai or not? probably not as fapar has considered the effect of lai.
-        gpp= aj * c_molmass * 1e-6 * 1e-3 * lai       ! aj in umol/m2/s, gpp kg C/m2/s multi-layer hypothesis
+        gpp= (aj + rdark*vcmax) * c_molmass * 1e-6 * 1e-3 * lai       ! aj in umol/m2/s, gpp kg C/m2/s multi-layer hypothesis
         !gpp= aj * c_molmass * 1e-6 * 1e-3            ! big leaf hypothesis
         
         if(phydro_debug)then
@@ -762,12 +762,14 @@ program SVMC
             metyasso(1), metyasso(2), metyasso_roll(1), metyasso_roll(2)
         end if
 
-        if (ISNAN(gpp) .or. (gpp .lt. 0.0)) then
+        if (ISNAN(aj) .or. (aj .lt. 0.0)) then
           gpp = 0.0
+          vcmax=0.0
         else 
           num_gpp_day= num_gpp_day+1
         end if
         gpp_day=gpp_day + gpp
+        vcmax_day=vcmax_day+vcmax
         
         if ((mod(tot_hour+1,24.0) .eq. 0)) then    ! here assume the start time is always the beginning of the day, i.e., 00:00 UTC!
                                                    ! tot_hour+1 is used to make sure 24 timesteps in each day: 0, 1 ...., 23
@@ -778,9 +780,12 @@ program SVMC
 
           if (num_gpp_day .eq. 0) then
             gpp_day = 0.0
+            vcmax   = 0.0
           else
             gpp_day = gpp_day/num_gpp_day
+            vcmax_day= vcmax_day/num_gpp_day
           end if
+          leaf_rdark_day=rdark * vcmax_day * c_molmass * 1e-6 * 1e-3 * lai
 
           ! run Topmodel
           ! catchment average ground water recharge [m per unit area]
@@ -811,7 +816,8 @@ program SVMC
         
           !call alloc_hypothesis_1(gpp_day, npp_day,  leaf_litter_c, root_litter_c, alloc_para)
           !AutoResp=gpp_day*0.5*3600*24
-          call alloc_hypothesis_2(temp_day, gpp_day, npp_day, AutoResp, croot, cleaf, cstem, leaf_litter_c, root_litter_c, &
+
+          call alloc_hypothesis_2(temp_day, gpp_day, npp_day, leaf_rdark_day, AutoResp, croot, cleaf, cstem, leaf_litter_c, root_litter_c, &
                                   compost, above_biomass, below_biomass, yield, &
                                   lai_alloc, alloc_para, manage_data, pheno_stage)
           

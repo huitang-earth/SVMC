@@ -54,7 +54,7 @@ MODULE readvegpara_mod
   
   character(len=256), public  :: opt_hypothesis, pft_type        ! character, Either "Lc" or "PM"
   integer  :: num_pft
-  real(8)  :: conductivity, psi50, b, alpha, gamma
+  real(8)  :: conductivity, psi50, b, alpha, gamma, rdark
 
 contains
 
@@ -73,7 +73,8 @@ contains
       b, &
       alpha, &
       gamma, &
-      opt_hypothesis
+      opt_hypothesis, &
+      rdark
 
     old=.false.
     num_pft=1
@@ -90,13 +91,16 @@ contains
     alpha=0.08     !cost of Jmax, default: 0.1
     gamma=1     !cost of hydraulic repair, default: 1
 
-    opt_hypothesis= 'PM'          ! character, Either "LC" or "PM"     
+    opt_hypothesis= 'PM'          ! character, Either "LC" or "PM"    
 
+    rdark=0.0                   ! eqivalent to "br" in Josh et al. 2022 
   
    ! Reading namelist
     open(unitvegpara, file='./veg_namelist', status='old', form='formatted', err=999)
     read(unitvegpara,veg_namelist,iostat=readerror)
     close(unitvegpara)
+
+    print *, "rdark= ", rdark
 
     return
 

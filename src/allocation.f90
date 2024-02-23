@@ -126,12 +126,13 @@ contains
 
    end subroutine alloc_hypothesis_1
 
-   subroutine alloc_hypothesis_2(temp_day, gpp_day, npp_day, auto_resp, croot, cleaf, cstem, litter_cleaf, litter_croot, &
+   subroutine alloc_hypothesis_2(temp_day, gpp_day, npp_day, leaf_rdark_day, auto_resp, croot, cleaf, cstem, litter_cleaf, litter_croot, &
                                   compost, abovebiomass, belowbiomass, yield, &
                                   lai, alloc_para, manage_data, pheno_stage)
 
       real(8), intent(in)    :: temp_day     ! temperature (exponentially averaged),  celcius degree
       real(8), intent(in)    :: gpp_day      ! gpp (daily average),  kg C m-2 s-1
+      real(8), intent(in)    :: leaf_rdark_day    ! leaf dark respiration (daily average), kg C m-2 s-1
       real(8), intent(inout) :: npp_day      ! npp (daily average),  kg C m-2 s-1
       real(8), intent(inout) :: auto_resp      ! npp (daily average),  kg C m-2 s-1
       real(8), intent(inout) :: croot        ! root carbon
@@ -140,7 +141,7 @@ contains
       real, intent(inout) :: litter_cleaf ! carbon input with "leaf" composition per day
       real, intent(inout) :: litter_croot ! carbon input with "root" composition per day
       real, intent(inout) :: compost      ! manure input (kg C m-2 s-1)
-      real(8), intent(inout) :: lai          ! leaf area index
+      real(8), intent(inout) :: lai          ! leaf area index, allometric
       real(8), intent(inout) :: abovebiomass ! Abovegroud biomass (kg dry mass m-2)
       real(8), intent(inout) :: belowbiomass ! Abovegroud biomass (kg dry mass m-2)
       real(8), intent(inout) :: yield        ! yield
@@ -157,9 +158,10 @@ contains
                                       ! Use reversed LAI (remote sensed) to leafc carbon to estimate litter?
 
          !if (manage_data%management_type .eq. 0) then    ! no management, organic fertilizer, potential yields, Nitrogen (?) 
-           npp_day = gpp_day * (1-alloc_para%cratio_resp * alloc_para%q10 ** ((temp_day - 20)/10)) * 3600 * 24
-           auto_resp = gpp_day * (alloc_para%cratio_resp) * alloc_para%q10 ** ((temp_day - 20)/10) * 3600 * 24
-
+           npp_day = (gpp_day * (1- (alloc_para%cratio_resp * alloc_para%q10 ** ((temp_day - 20)/10)) * (1-alloc_para%cratio_leaf)) &                                 
+                              - leaf_rdark_day )* 3600 * 24
+           auto_resp = (gpp_day *  (1-alloc_para%cratio_leaf) * (alloc_para%cratio_resp * alloc_para%q10 ** ((temp_day - 20)/10)) 
+                              + leaf_rdark_day )* 3600 * 24
 
            litter_cleaf=cleaf * alloc_para%turnover_cleaf * alloc_para%q10 ** ((temp_day  - 20)/10)
            litter_cstem=cstem * alloc_para%turnover_cleaf * alloc_para%q10 ** ((temp_day  - 20)/10)
