@@ -1,5 +1,5 @@
 &alloc_namelist
- cratio_resp=0.002
+ cratio_resp=2.0e-9
  cratio_leaf=0.8
  cratio_root=0.2
  cratio_biomass=0.42
