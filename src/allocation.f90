@@ -6,7 +6,7 @@ implicit none
    !----------------------------
    ! allometric parameters
    !-----------------------------
-     real(8) :: cratio_resp         ! fraction of respiration to gpp at 20 degree
+     real(8) :: cratio_resp         ! fraction of maintenance respiration (1/m2/s) at 20 degree
      real(8) :: cratio_leaf         ! carbon ratio of leaf to npp
      real(8) :: cratio_root         ! carbon ratio of root to npp
      real(8) :: cratio_biomass      ! carbon ratio of biomass
@@ -158,9 +158,11 @@ contains
                                       ! Use reversed LAI (remote sensed) to leafc carbon to estimate litter?
 
          !if (manage_data%management_type .eq. 0) then    ! no management, organic fertilizer, potential yields, Nitrogen (?) 
-           npp_day = (gpp_day * (1- (alloc_para%cratio_resp * alloc_para%q10 ** ((temp_day - 20)/10)) * (1-alloc_para%cratio_leaf)) &                                 
+         
+         ! Allow maintenance respiration of root to be calculated from root carbon storage, not gpp.
+           npp_day = (gpp_day - (croot + cstem) * (alloc_para%cratio_resp * alloc_para%q10 ** ((temp_day - 20)/10)) &
                               - leaf_rdark_day )* 3600 * 24
-           auto_resp = (gpp_day *  (1-alloc_para%cratio_leaf) * (alloc_para%cratio_resp * alloc_para%q10 ** ((temp_day - 20)/10)) 
+           auto_resp = ((croot + cstem) * (alloc_para%cratio_resp * alloc_para%q10 ** ((temp_day - 20)/10)) &
                               + leaf_rdark_day )* 3600 * 24
 
            litter_cleaf=cleaf * alloc_para%turnover_cleaf * alloc_para%q10 ** ((temp_day  - 20)/10)

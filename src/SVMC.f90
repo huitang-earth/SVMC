@@ -119,7 +119,7 @@ program SVMC
   ! alloc variables
   real(8)    :: croot=0.0, cleaf=0.0, cstem=0.0
   real(8)    :: above_biomass, below_biomass, yield
-  integer    :: pheno_stage=1, num_gpp_day=0
+  integer    :: pheno_stage=1, num_gpp_day=0, num_vcmax_day=0
 
   ! For soil water retention curve
  ! real(8) :: watsat      ! v/v saturate moisture
@@ -764,11 +764,16 @@ program SVMC
 
         if (ISNAN(aj) .or. (aj .lt. 0.0)) then
           gpp = 0.0
-          vcmax=0.0
         else 
           num_gpp_day= num_gpp_day+1
         end if
         gpp_day=gpp_day + gpp
+
+        if (ISNAN(vcmax) .or. (vcmax .le. 0.0)) then
+          vcmax=0.0
+        else 
+          num_vcmax_day= num_vcmax_day+1
+        end if
         vcmax_day=vcmax_day+vcmax
         
         if ((mod(tot_hour+1,24.0) .eq. 0)) then    ! here assume the start time is always the beginning of the day, i.e., 00:00 UTC!
@@ -780,11 +785,18 @@ program SVMC
 
           if (num_gpp_day .eq. 0) then
             gpp_day = 0.0
-            vcmax   = 0.0
           else
             gpp_day = gpp_day/num_gpp_day
-            vcmax_day= vcmax_day/num_gpp_day
           end if
+
+          if (num_vcmax_day .eq. 0) then
+            vcmax_day   = 0.0
+          else
+            vcmax_day= vcmax_day/num_vcmax_day
+          end if
+
+          ! Using the average of vcmax (>0) during the daytime to represent daily average vcmax and maintenance respiration. 
+          ! An alternative: using the average of vcmax (vcmax>=0) during the whole day to represent daily average vcmax and maintenance respiration, rdark will have to be adjusted then.   
           leaf_rdark_day=rdark * vcmax_day * c_molmass * 1e-6 * 1e-3 * lai
 
           ! run Topmodel
@@ -932,6 +944,7 @@ program SVMC
           precip_day=0.0
           melt_day=0.0
           num_gpp_day=0
+          num_vcmax_day=0
         end if
       end do ! pft
     end do  ! site
