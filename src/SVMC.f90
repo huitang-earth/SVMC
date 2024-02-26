@@ -254,9 +254,9 @@ program SVMC
   input_manage=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.management.nc'
   input_snowdepth=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.snowdepth.nc'
   output_filename_day=trim(output_dir)//'SVM_'//trim(sites_name)//'.'//trim(year_str)  &
-                      //'.day_C2_laigp0_root0.6_meltroll_coupled_snow.nc' 
+                      //'.day_C2_newrep.nc' 
   output_filename_hr=trim(output_dir)//'SVM_'//trim(sites_name)//'.'//trim(year_str)   &
-                      //'.hr_C2_laigp0_root0.6_meltroll_coupled_snow.nc'           
+                      //'.hr_C2_newrep.nc'           
 
   print *, "input_climfile= ", input_climfile
   print *, "input_laifile= ", input_laifile
@@ -408,9 +408,9 @@ program SVMC
           input_manage=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.management.nc'
           input_snowdepth=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.snowdepth.nc'
           output_filename_day=trim(output_dir)//'SVM_'//trim(sites_name)//'.'//trim(year_str)   &
-                                 //'.day_C2_laigp0_root0.6_meltroll_coupled_snow.nc' 
+                                 //'.day_C2_newrep.nc' 
           output_filename_hr=trim(output_dir)//'SVM_'//trim(sites_name)//'.'//trim(year_str)    &
-                                //'.hr_C2_laigp0_root0.6_meltroll_coupled_snow.nc' 
+                                //'.hr_C2_newrep.nc' 
 
           write(98, *) "input_climfile= ", input_climfile
           write(98, *) "input_laifile= ", input_laifile
@@ -829,8 +829,8 @@ program SVMC
           !call alloc_hypothesis_1(gpp_day, npp_day,  leaf_litter_c, root_litter_c, alloc_para)
           !AutoResp=gpp_day*0.5*3600*24
 
-          call alloc_hypothesis_2(temp_day, gpp_day, npp_day, leaf_rdark_day, AutoResp, croot, cleaf, cstem, leaf_litter_c, root_litter_c, &
-                                  compost, above_biomass, below_biomass, yield, &
+          call alloc_hypothesis_2(temp_day, gpp_day, npp_day, leaf_rdark_day, AutoResp, croot, cleaf, cstem, & 
+                                  leaf_litter_c, root_litter_c, compost, above_biomass, below_biomass, yield, &
                                   lai_alloc, alloc_para, manage_data, pheno_stage)
           
           leaf_litter_c_year = leaf_litter_c_year + leaf_litter_c

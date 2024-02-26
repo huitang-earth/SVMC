@@ -88,7 +88,7 @@ contains
       read(unitallocpara,alloc_namelist,iostat=readerror)
       close(unitallocpara)
 
-      print *, "harvest_index=", harvest_index
+      print *, "q10=", q10
 
       alloc_para%cratio_resp    = cratio_resp
       alloc_para%cratio_leaf    = cratio_leaf
@@ -126,8 +126,8 @@ contains
 
    end subroutine alloc_hypothesis_1
 
-   subroutine alloc_hypothesis_2(temp_day, gpp_day, npp_day, leaf_rdark_day, auto_resp, croot, cleaf, cstem, litter_cleaf, litter_croot, &
-                                  compost, abovebiomass, belowbiomass, yield, &
+   subroutine alloc_hypothesis_2(temp_day, gpp_day, npp_day, leaf_rdark_day, auto_resp, croot, cleaf, cstem, & 
+                                  litter_cleaf, litter_croot, compost, abovebiomass, belowbiomass, yield, &
                                   lai, alloc_para, manage_data, pheno_stage)
 
       real(8), intent(in)    :: temp_day     ! temperature (exponentially averaged),  celcius degree
