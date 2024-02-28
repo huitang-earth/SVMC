@@ -85,7 +85,7 @@ program SVMC
                                 chi_matrix, profit_matrix, gs_matrix, &
                                 evap_matrix, psi_soil_matrix, soilmoist1_matrix, tmp_matrix
 
-  real(8)     ::    lai, lai_alloc
+  real(8)     ::    lai=0.0, lai_alloc, delta_lai
 
   real(8)    :: jmax       !  The maximum rate of RuBP regeneration (umol/m2/s) at growth temperature (argument\code{tc}), calculated using
                                                 ! \deqn{A_J = A_C} 
@@ -235,7 +235,9 @@ program SVMC
 
   ! Here we assume all input files have time stamp starting from the beginning of the year
   ! In rare cases when the starting date of the input file is not the beginnig of the year, we need to manually adjust the date.
-  start_clim_juldate      =juldate(year_cur*10000+100+1,000000)
+  ! e.g., Qvidja 2018: clim forcing file starts from 2018.05.08
+  start_clim_juldate      =juldate(year_cur*10000+500+8,000000)
+  !start_clim_juldate      =juldate(year_cur*10000+100+1,000000)
   start_lai_juldate       =juldate(year_cur*10000+100+1,000000)
   start_soilmoist_juldate =juldate(year_cur*10000+100+1,000000)
   start_snowdepth_juldate =juldate(year_cur*10000+100+1,000000)
@@ -506,11 +508,14 @@ program SVMC
             call netCDF_readlai(input_laifile, lai_matrix, step_lai)
             print *, "OK2"
             step_lai=step_lai+1
-            if (snowdepth .lt. 0.0005) then
+            ! need to turn off snowdepth control on lai when invert_option=1, 2.
+            !if (snowdepth .lt. 0.0005) then
+              delta_lai=lai_matrix(1,1,1)-lai
               lai=lai_matrix(1,1,1)
-            else
-              lai=0.0
-            end if 
+            !else
+            !  delta_lai=0.0
+            !  lai=0.0
+            !end if 
             ! calculate fapar:
             fapar= 1-exp(-k*lai)
           end if
@@ -828,6 +833,7 @@ program SVMC
         
           !call alloc_hypothesis_1(gpp_day, npp_day,  leaf_litter_c, root_litter_c, alloc_para)
           !AutoResp=gpp_day*0.5*3600*24
+          call invert_alloc(delta_lai, alloc_para, leaf_rdark_day, temp_day, leaf_litter_c, gpp_day, cleaf, cstem, manage_data)
 
           call alloc_hypothesis_2(temp_day, gpp_day, npp_day, leaf_rdark_day, AutoResp, croot, cleaf, cstem, & 
                                   leaf_litter_c, root_litter_c, compost, above_biomass, below_biomass, yield, &
@@ -892,6 +898,7 @@ program SVMC
           call netCDF_writeOUTPUT(output_filename_day, "HeteroResp", HeteroResp, hour_yr/24.0, step_nc_day) 
           call netCDF_writeOUTPUT(output_filename_day, "AutoResp", AutoResp/24/3600, hour_yr/24.0, step_nc_day)         
           call netCDF_writeOUTPUT(output_filename_day, "TotalResp", TotalResp, hour_yr/24.0, step_nc_day) 
+          !call netCDF_writeOUTPUT(output_filename_day, "TotalResp", leaf_rdark_day, hour_yr/24.0, step_nc_day) 
           call netCDF_writeOUTPUT(output_filename_day, "GPP", gpp_day, hour_yr/24.0, step_nc_day)
           call netCDF_writeOUTPUT(output_filename_day, "NEE", nee_day, hour_yr/24.0, step_nc_day)
           call netCDF_writeOUTPUT(output_filename_day, "LAI", lai_alloc, hour_yr/24.0, step_nc_day) 
@@ -901,6 +908,11 @@ program SVMC
           call netCDF_writeOUTPUT(output_filename_day, "soil_carbon_content", sum(soilcn_state%cstate), hour_yr/24.0, step_nc_day) 
           call netCDF_writeOUTPUT(output_filename_day, "temperature_yasso", metyasso_roll(1), hour_yr/24.0, step_nc_day) 
           call netCDF_writeOUTPUT(output_filename_day, "precipitation_yasso", metyasso_roll(2), hour_yr/24.0, step_nc_day) 
+
+          call netCDF_writeOUTPUT(output_filename_day, "Vcmax", leaf_rdark_day, hour_yr/24.0, step_nc_day)
+          call netCDF_writeOUTPUT(output_filename_day, "Jmax", alloc_para%cratio_leaf, hour_yr/24.0, step_nc_day)
+          call netCDF_writeOUTPUT(output_filename_day, "Chi", alloc_para%turnover_cleaf, hour_yr/24.0, step_nc_day)
+          call netCDF_writeOUTPUT(output_filename_day, "Dpsi", delta_lai, hour_yr/24.0, step_nc_day)
 
           step_nc_day= step_nc_day+1
 
