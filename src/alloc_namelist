@@ -1,11 +1,12 @@
 &alloc_namelist
- cratio_resp=2.0e-9
+ cratio_resp=5.0e-8
  cratio_leaf=0.8
  cratio_root=0.2
  cratio_biomass=0.42
  harvest_index=0.8
- turnover_cleaf=0.00112 
- turnover_croot=0.00112
+ turnover_cleaf=0.02 
+ turnover_croot=0.004
  sla=10
  q10=2
+ invert_option=2
 /
