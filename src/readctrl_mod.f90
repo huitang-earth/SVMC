@@ -34,7 +34,7 @@ MODULE readctrl_mod
   real(8), dimension(1)    :: lat_sites, lon_sites   ! This can be set by reading input file 
   real    :: time_step, time_step_output
   character(len=256)  :: output_dir, input_dir
-  character(len=256)  :: sites_name           ! need to be allocable.
+  character(len=256)  :: sites_name, experiment_id           ! need to be allocable.
   logical :: obs_lai, obs_soilmoist, obs_snowdepth, obs_manage, yasso_year, &
              phydro_debug, yasso_debug, water_debug
   integer :: log_level
@@ -65,7 +65,8 @@ contains
     phydro_debug, &
     yasso_debug, & 
     water_debug, &
-    log_level
+    log_level, &
+    experiment_id
 
     old=.false.
     
@@ -91,13 +92,14 @@ contains
     yasso_debug=.false.
     water_debug=.false.
     log_level=1
+    experiment_id="test"
 
     ! Reading namelist
     open(unitcommand, file='./ctrl_namelist', status='old', form='formatted', err=999)
     read(unitcommand, ctrl_namelist, iostat=readerror)
     close(unitcommand)
     
-    print *, "obs_snowdepth= ", obs_snowdepth
+    print *, "experiment_id= ", experiment_id
 
     if (time_step.eq.0) then
       write(*,*) ' #### MODEL ERROR! TIME STEP MUST    #### '
