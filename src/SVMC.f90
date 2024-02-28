@@ -254,9 +254,9 @@ program SVMC
   input_manage=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.management.nc'
   input_snowdepth=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.snowdepth.nc'
   output_filename_day=trim(output_dir)//'SVM_'//trim(sites_name)//'.'//trim(year_str)  &
-                      //'.day_C2_newrep.nc' 
+                      //'.day_'//trim(experiment_id)//'.nc' 
   output_filename_hr=trim(output_dir)//'SVM_'//trim(sites_name)//'.'//trim(year_str)   &
-                      //'.hr_C2_newrep.nc'           
+                      //'.hr_'//trim(experiment_id)//'.nc'           
 
   print *, "input_climfile= ", input_climfile
   print *, "input_laifile= ", input_laifile
@@ -408,9 +408,9 @@ program SVMC
           input_manage=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.management.nc'
           input_snowdepth=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.snowdepth.nc'
           output_filename_day=trim(output_dir)//'SVM_'//trim(sites_name)//'.'//trim(year_str)   &
-                                 //'.day_C2_newrep.nc' 
+                                 //'.day_'//trim(experiment_id)//'.nc' 
           output_filename_hr=trim(output_dir)//'SVM_'//trim(sites_name)//'.'//trim(year_str)    &
-                                //'.hr_C2_newrep.nc' 
+                                //'.hr_'//trim(experiment_id)//'.nc'  
 
           write(98, *) "input_climfile= ", input_climfile
           write(98, *) "input_laifile= ", input_laifile
