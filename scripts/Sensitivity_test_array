@@ -1,0 +1,67 @@
+#!/bin/bash
+
+#SBATCH --job-name=svm_array_job
+#SBATCH --output=svm_array_job_out_%A_%a.txt
+#SBATCH --error=svm_array_job_err_%A_%a.txt
+#SBATCH --account=project_2006422
+#SBATCH --partition=fmi
+#SBATCH --time=00:15:00
+#SBATCH --ntasks=1
+#SBATCH --mem-per-cpu=4000
+#SBATCH --array=1-80
+
+# set the input file to process
+#name=$(sed -n ${SLURM_ARRAY_TASK_ID}p /users/tanghui1/SVMC/python/param_values.txt)
+#echo $name 
+#echo ""
+
+  module load geoconda
+  source /projappl/project_2006422/python/venv/bin/activate
+
+  pre_sen="F"
+  run_case="F"
+  post_proc="F"
+  post_sen="T"
+
+  echo ${SLURM_ARRAY_TASK_ID}
+  let "lineno=SLURM_ARRAY_TASK_ID+1200"
+  echo ${lineno}
+    
+if [ ${run_case} == "T" ]
+then
+  while IFS=" " read -r conduct psi alpha gamma
+  do
+    echo "para1: $conduct"
+    echo "para2: $psi"
+    echo "para3: $alpha"
+    echo "para4: $gamma"
+    echo "expid: $lineno"
+    
+   /users/tanghui1/SVMC/Single_run.sh $conduct $psi $alpha $gamma $lineno $run_case
+  
+  done < <(tail -n +${lineno} /users/tanghui1/SVMC/python/param_values.txt | head -n 1)
+fi
+
+if [ ${post_proc} == "T" ]
+then
+  
+  conduct=0 
+  psi=0 
+  alpha=0
+  gamma=0
+  #lineno=368
+  
+  /users/tanghui1/SVMC/Single_run.sh $conduct $psi $alpha $gamma $lineno $run_case
+  
+fi
+
+#------- aggregate all the sensitivity experiments:
+
+#ncecat -u expid SVM_Qvidja_hr_vegsen_*.nc SVM_Qvidja_hr_vegsen.all.nc
+#ncecat -u expid SVM_Qvidja_day_vegsen_*.nc SVM_Qvidja_day_vegsen.all.nc
+
+if [ ${post_sen} == "T" ]
+then
+  python /users/tanghui1/SVMC/python/salib_test.py
+
+fi

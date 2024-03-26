@@ -1,0 +1,48 @@
+#!/bin/bash
+
+#SBATCH --time=02:00:00
+#SBATCH --partition=fmi
+#SBATCH --job-name=svm
+#SBATCH --account=project_2006422
+#SBATCH --mem-per-cpu=4000
+#SBATCH --ntasks=1
+
+######### Set "run_***" to "T" to run the site simulation
+run_case="T"            # T or F, swtich for running long experiments
+post_proc="F"         # T or F, swtich for archiving experiments. 
+
+para_file="/users/tanghui1/SVMC/python/param_values.txt"
+
+module load geoconda
+source /projappl/project_2006422/python/venv/bin/activate
+
+
+if [ ${run_case} == "T" ]
+then
+
+  #python salib_sample.py $para_file
+  expid=0
+
+  while IFS=" " read -r conduct psi alpha gamma
+  do
+    let "expid=expid+1"
+    echo "para1: $conduct"
+    echo "para2: $psi"
+    echo "para3: $alpha"
+    echo "para4: $gamma"
+    echo "expid: $expid"
+    
+    sbatch /users/tanghui1/SVMC/Single_run.sh $conduct $psi $alpha $gamma $expid $run_case
+  
+  done < <(tail -n +1 /users/tanghui1/SVMC/python/param_values_test.txt)
+
+fi
+
+if [ ${post_proc} == "T" ]
+then
+
+  python salib_analyze.py $para_file $run_case $post_proc
+
+fi
+
+#my_variable=$(python my_script.py)
