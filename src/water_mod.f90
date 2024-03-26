@@ -204,7 +204,8 @@ contains
     real(8) :: eff_porosity! v/v, volume of ice
         
     n1 = spafhy_para%n_van 
-    m1 = 1.0/n1  
+    !m1 = 1.0/n1
+    m1=1-1.0/n1  
     alpha_van = spafhy_para%alpha_van 
     watsat = spafhy_para%watsat  
     watres = spafhy_para%watres
@@ -213,7 +214,8 @@ contains
     eff_porosity = max(0.01, watsat - vol_ice)
     
     satfrac = (vol_liq-watres)/(eff_porosity-watres)
-    smp = -(1.0/alpha_van)*(satfrac**(1.0/(m1-1.0)) - 1.0 )**m1 !kPa
+    !smp = -(1.0/alpha_van)*(satfrac**(1.0/(m1-1.0)) - 1.0 )**m1 !kPa
+    smp = -(1.0/alpha_van)*(satfrac**(1.0/(-m1)) - 1.0 )**(1.0/n1) 
     smp = smp * 0.001 !MPa
 
   END SUBROUTINE soil_water_retention_curve
@@ -233,7 +235,7 @@ contains
     real(8) :: eff_porosity! v/v, volume of ice
 
     n1 = spafhy_para%n_van 
-    m1 = 1.0/n1  
+    m1 = 1-1.0/n1  
     alpha_van = spafhy_para%alpha_van
 
     watsat = spafhy_para%watsat  
@@ -282,7 +284,7 @@ contains
 
     ! Calculate soil evaporation rate
     AE = Rn * (1 - fapar)
-    print *, "fapar=", fapar
+   ! print *, "fapar=", fapar
 
     call ground_evaporation(canopywater_state, canopywater_flux, soilwater_state, spafhy_para, Ta, AE, VPD, Ras, P)
 
