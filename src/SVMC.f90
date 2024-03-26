@@ -281,12 +281,12 @@ program SVMC
 
   !********* open file for writing log and debug outputs
 
-  inquire(file="logbook.txt", exist=exist)
+  inquire(file='logbook_'//trim(experiment_id)//'.txt', exist=exist)
   if (exist) then
-    open(98, file ='logbook.txt', status = 'old', action="write")
+    open(98, file ='logbook_'//trim(experiment_id)//'.txt', status = 'old', action="write")
     !open(98, file ='logbook.txt', status = 'old', position="append", action="write")
   else
-    open(98, file ='logbook.txt', status = 'new',action="write")
+    open(98, file ='logbook_'//trim(experiment_id)//'.txt', status = 'new',action="write")
   end if
   
   write(98, *) "model start at ", start_date_day
