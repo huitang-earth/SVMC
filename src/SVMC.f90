@@ -158,7 +158,7 @@ program SVMC
   ! call initialization
    
   call readctrl_namelist
-  print *, "obs_snowdepth= ", obs_snowdepth
+  ! print *, "obs_snowdepth= ", obs_snowdepth
   call readvegpara_namelist
 
   call readsoilhydro_namelist(spafhy_para)
@@ -260,13 +260,13 @@ program SVMC
   output_filename_hr=trim(output_dir)//'SVM_'//trim(sites_name)//'.'//trim(year_str)   &
                       //'.hr_'//trim(experiment_id)//'.nc'           
 
-  print *, "input_climfile= ", input_climfile
-  print *, "input_laifile= ", input_laifile
-  print *, "input_soilmoist= ", input_soilmoist
-  print *, "input_manage= ", input_manage
-  print *, "input_snowdepth= ", input_snowdepth
-  print *, "output_filename_day= ", output_filename_day
-  print *, "output_filename_hr= ", output_filename_hr
+  ! print *, "input_climfile= ", input_climfile
+  ! print *, "input_laifile= ", input_laifile
+  ! print *, "input_soilmoist= ", input_soilmoist
+  ! print *, "input_manage= ", input_manage
+  ! print *, "input_snowdepth= ", input_snowdepth
+  ! print *, "output_filename_day= ", output_filename_day
+  ! print *, "output_filename_hr= ", output_filename_hr
 
   ! Read time series of input data
   ! Here "start_clim_time" is just a real number and meaningless without knowning the units of time variable. 
@@ -496,17 +496,17 @@ program SVMC
 
         !********** Read daily input data
         if (mod(tot_hour,24.0) .eq. 0) then
-          print *, "OK0"            
+          ! print *, "OK0"            
           if (obs_snowdepth) then
             call netCDF_readsnow(input_snowdepth, snowdepth_matrix, step_snowdepth)
             snowdepth=snowdepth_matrix(1,1,1)               
             step_snowdepth=step_snowdepth+1
-            print *, "OK1"
+            ! print *, "OK1"
           end if
 
           if (obs_lai) then
             call netCDF_readlai(input_laifile, lai_matrix, step_lai)
-            print *, "OK2"
+            ! print *, "OK2"
             step_lai=step_lai+1
             ! need to turn off snowdepth control on lai when invert_option=1, 2.
             !if (snowdepth .lt. 0.0005) then
@@ -522,7 +522,7 @@ program SVMC
               
           if (obs_soilmoist) then
             call netCDF_readsoilmoist(input_soilmoist, soilmoist_matrix, step_soilmoist)
-            print *, "OK3"
+            ! print *, "OK3"
             soilmoist=soilmoist_matrix(1,1,1)               
             call soil_water_retention_curve(soilmoist, spafhy_para, psi_soil)
             step_soilmoist=step_soilmoist+1
@@ -533,7 +533,7 @@ program SVMC
             call netCDF_readmanagement(input_manage, manage_data%management_type, & 
                             manage_data%management_c_input, manage_data%management_c_output, & 
                             manage_data%management_n_input, manage_data%management_n_output, step_management)
-            print *, "OK4"
+            ! print *, "OK4"
             step_management=step_management+1
           else
             manage_data%management_type=0
@@ -549,7 +549,7 @@ program SVMC
         call netCDF_readClim(input_climfile, temp_matrix, ppfd_matrix, rg_matrix, prec_matrix, &
                        sh_matrix, rh_matrix, vpd_matrix, pres_matrix, &
                        co2_matrix, wind_matrix, step_clim)
-        print *, "OK5"
+        ! print *, "OK5"
         step_clim=step_clim+1
 
         temp=temp_matrix(1,1,1) ! deg C or K???
@@ -675,11 +675,11 @@ program SVMC
           !************************************************************************
           if(step_nc_hr.eq.0)then
             !Initialize netcdf file
-            print *, "ntim_out_hr=", ntim_out_hr
+            !print *, "ntim_out_hr=", ntim_out_hr
             call netCDF_prepareOUTPUT(output_filename_hr, cur_date, 000000, lon_sites, lat_sites, ntim_out_hr)
           end if
 
-          print *, "step_nc_hr=", step_nc_hr
+          ! print *, "step_nc_hr=", step_nc_hr
           call netCDF_writeOUTPUT(output_filename_hr, "GPP", gpp, hour_yr/24.0, step_nc_hr)
           call netCDF_writeOUTPUT(output_filename_hr, "stomatal_conductance", gs, hour_yr/24.0, step_nc_hr)
           call netCDF_writeOUTPUT(output_filename_hr, "Jmax", jmax, hour_yr/24.0, step_nc_hr)

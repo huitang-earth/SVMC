@@ -196,7 +196,7 @@ contains
     !iwa=3*nmax
     
     task="START"
-    iprint=40   ! print a bit more than usual
+    iprint=0   ! print a bit more than usual
     lsave= (/.True., .True., .True., .True./)     ! 
     isave(1:44)=0        !
     dsave(1:29)=0.0      !
