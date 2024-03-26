@@ -7,10 +7,13 @@
 - Go to `src` folder. Run the following command:
 ```
 # For Puhti:  
+
+module load gcc/11.3.0 openmpi/4.1.4 netcdf-fortran/4.5.4
 gmake -f Makefile_puhti
 
 # For containers (docker or openshift)
 gmake -f Makefile_container
+
 ```
 - The program **SVMC** will appear in the `src` folder.
 - Need to adapt the [library path](https://github.com/huitang-earth/SVMC/blob/f177abfb135c5111fdfd56436410c0f973d79f2b/src/Makefile_puhti#L16) and [include path](https://github.com/huitang-earth/SVMC/blob/f177abfb135c5111fdfd56436410c0f973d79f2b/src/Makefile_puhti#L8) of netcdf library when needed. 
