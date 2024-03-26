@@ -39,7 +39,7 @@ contains
   
   !---------------------------------------------------------
   SUBROUTINE pmodel_hydraulics_numerical(tc, ppfd, vpd, co2, sp, fapar, & 
-                     psi_soil, rdark,                                   &
+                     psi_soil, rdark_leaf,                                   &
                      jmax, dpsi, gs, aj, ci, chi, vcmax, profit, chi_jmax_lim)
     !
     ! !DESCRIPTION:
@@ -58,7 +58,7 @@ contains
     real(8)      , intent(in)    :: fapar  ! Fraction of absorbed photosynthetically active radiation (unitless) (will be calculated using LAI) 
     !real(8)      , intent(in)    :: kphio  ! Apparent quantum yield efficiency (unitless).
     real(8)      , intent(in)    :: psi_soil  ! soil water potential (Mpa)
-    real(8)      , intent(in)    :: rdark ! Dark respiration \eqn{Rd} (mol C m-2)
+    real(8)      , intent(in)    :: rdark_leaf ! Dark respiration \eqn{Rd} (mol C m-2)
   
 
     !character(len=200)  , intent(in)  :: opt_hypothesis='PM'   ! character, Either "Lc" or "PM"
@@ -99,7 +99,7 @@ contains
     par_photosynth_now%Iabs = ppfd*fapar
     par_photosynth_now%ca = co2*sp*1e-6             ! Convert to partial pressure
     par_photosynth_now%patm = sp
-    par_photosynth_now%delta = rdark
+    par_photosynth_now%delta = rdark_leaf
   
     par_env_now%viscosity_water = viscosity_h2o(tc, sp)
     par_env_now%density_water = density_h2o(tc, sp)
@@ -196,7 +196,7 @@ contains
     !iwa=3*nmax
     
     task="START"
-    iprint=40   ! print a bit more than usual
+    iprint=0   ! print a bit more than usual
     lsave= (/.True., .True., .True., .True./)     ! 
     isave(1:44)=0        !
     dsave(1:29)=0.0      !

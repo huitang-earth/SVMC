@@ -2,7 +2,7 @@
 start_date_day=20180510
 start_date_hour=000000
 time_step=1
-end_date_day=20190101
+end_date_day=20230101
 end_date_hour=000000
 num_sites=1
 sites_name='Qvidja'
@@ -18,4 +18,5 @@ phydro_debug=.false.
 yasso_debug=.true.
 water_debug=.true.
 log_level=1
+experiment_id='newresp2_invert2'
 /

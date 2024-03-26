@@ -74,8 +74,8 @@ program SVMC
   real(8)     ::    wind
   real(8)     ::    rg, rn
   real(8)     ::    psi_soil, psi_soil_spafhy  ! soil water potential (Mpa)
-  real(8)     ::    soilmoist, snowdepth
-  real(8)     ::    rdark     
+  real(8)     ::    soilmoist, snowdepth   
+  real(8)     ::    leaf_rdark_day          ! daily averaged leaf dark respiration rate (kg C m-2 s-1)
 
   real(8), dimension(1,1,1)  :: lai_matrix, soilmoist_matrix, snowdepth_matrix
   real(8), dimension(1,1,1)  :: temp_matrix, ppfd_matrix, rg_matrix, prec_matrix, &
@@ -85,7 +85,7 @@ program SVMC
                                 chi_matrix, profit_matrix, gs_matrix, &
                                 evap_matrix, psi_soil_matrix, soilmoist1_matrix, tmp_matrix
 
-  real(8)     ::    lai, lai_alloc
+  real(8)     ::    lai=0.0, lai_alloc, delta_lai
 
   real(8)    :: jmax       !  The maximum rate of RuBP regeneration (umol/m2/s) at growth temperature (argument\code{tc}), calculated using
                                                 ! \deqn{A_J = A_C} 
@@ -95,7 +95,7 @@ program SVMC
   real(8)    :: aj         ! electron-transport limited assimilation rate (umol/m2/s)
   real(8)    :: ci         !  leaf-internal CO2 concentration, converted to partial pressure (Pa)
   real(8)    :: chi        ! Optimal ratio of leaf internal to ambient CO2 (unitless).
-  real(8)    :: vcmax      !   Carboxylation capacity (umol/m2/s)
+  real(8)    :: vcmax, vcmax_day      !   Carboxylation capacity (umol/m2/s)
   real(8)    :: profit                  ! Net assimilation rate after accounting for costs
   real(8)    :: chi_jmax_lim      ! Analytical chi in the case of strong Jmax limitation
   real(8)    :: gpp, gpp_day, npp_day, nee_day
@@ -119,7 +119,7 @@ program SVMC
   ! alloc variables
   real(8)    :: croot=0.0, cleaf=0.0, cstem=0.0
   real(8)    :: above_biomass, below_biomass, yield
-  integer    :: pheno_stage=1, num_gpp_day=0
+  integer    :: pheno_stage=1, num_gpp_day=0, num_vcmax_day=0
 
   ! For soil water retention curve
  ! real(8) :: watsat      ! v/v saturate moisture
@@ -158,11 +158,12 @@ program SVMC
   ! call initialization
    
   call readctrl_namelist
-  print *, "obs_snowdepth= ", obs_snowdepth
+  ! print *, "obs_snowdepth= ", obs_snowdepth
   call readvegpara_namelist
 
   call readsoilhydro_namelist(spafhy_para)
   call readsoilyasso_namelist(yasso_para)
+  call readalloc_namelist(alloc_para)
   
   !call set_soilwaterState(soilwater_state, canopywater_state)
   call initialization_spafhy(canopywater_state, soilwater_state, spafhy_para)
@@ -185,6 +186,7 @@ program SVMC
   precip_day=0.0
   melt_day=0.0
   gpp_day=0.0
+  vcmax_day=0.0
 
   !***********************************
   ! Set time control parameters
@@ -233,7 +235,9 @@ program SVMC
 
   ! Here we assume all input files have time stamp starting from the beginning of the year
   ! In rare cases when the starting date of the input file is not the beginnig of the year, we need to manually adjust the date.
-  start_clim_juldate      =juldate(year_cur*10000+100+1,000000)
+  ! e.g., Qvidja 2018: clim forcing file starts from 2018.05.08
+  start_clim_juldate      =juldate(year_cur*10000+500+8,000000)
+  !start_clim_juldate      =juldate(year_cur*10000+100+1,000000)
   start_lai_juldate       =juldate(year_cur*10000+100+1,000000)
   start_soilmoist_juldate =juldate(year_cur*10000+100+1,000000)
   start_snowdepth_juldate =juldate(year_cur*10000+100+1,000000)
@@ -252,17 +256,17 @@ program SVMC
   input_manage=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.management.nc'
   input_snowdepth=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.snowdepth.nc'
   output_filename_day=trim(output_dir)//'SVM_'//trim(sites_name)//'.'//trim(year_str)  &
-                      //'.day_C2_laigp0_root0.6_meltroll_coupled_snow.nc' 
+                      //'.day_'//trim(experiment_id)//'.nc' 
   output_filename_hr=trim(output_dir)//'SVM_'//trim(sites_name)//'.'//trim(year_str)   &
-                      //'.hr_C2_laigp0_root0.6_meltroll_coupled_snow.nc'           
+                      //'.hr_'//trim(experiment_id)//'.nc'           
 
-  print *, "input_climfile= ", input_climfile
-  print *, "input_laifile= ", input_laifile
-  print *, "input_soilmoist= ", input_soilmoist
-  print *, "input_manage= ", input_manage
-  print *, "input_snowdepth= ", input_snowdepth
-  print *, "output_filename_day= ", output_filename_day
-  print *, "output_filename_hr= ", output_filename_hr
+  ! print *, "input_climfile= ", input_climfile
+  ! print *, "input_laifile= ", input_laifile
+  ! print *, "input_soilmoist= ", input_soilmoist
+  ! print *, "input_manage= ", input_manage
+  ! print *, "input_snowdepth= ", input_snowdepth
+  ! print *, "output_filename_day= ", output_filename_day
+  ! print *, "output_filename_hr= ", output_filename_hr
 
   ! Read time series of input data
   ! Here "start_clim_time" is just a real number and meaningless without knowning the units of time variable. 
@@ -277,12 +281,12 @@ program SVMC
 
   !********* open file for writing log and debug outputs
 
-  inquire(file="logbook.txt", exist=exist)
+  inquire(file='logbook_'//trim(experiment_id)//'.txt', exist=exist)
   if (exist) then
-    open(98, file ='logbook.txt', status = 'old', action="write")
+    open(98, file ='logbook_'//trim(experiment_id)//'.txt', status = 'old', action="write")
     !open(98, file ='logbook.txt', status = 'old', position="append", action="write")
   else
-    open(98, file ='logbook.txt', status = 'new',action="write")
+    open(98, file ='logbook_'//trim(experiment_id)//'.txt', status = 'new',action="write")
   end if
   
   write(98, *) "model start at ", start_date_day
@@ -406,9 +410,9 @@ program SVMC
           input_manage=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.management.nc'
           input_snowdepth=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.snowdepth.nc'
           output_filename_day=trim(output_dir)//'SVM_'//trim(sites_name)//'.'//trim(year_str)   &
-                                 //'.day_C2_laigp0_root0.6_meltroll_coupled_snow.nc' 
+                                 //'.day_'//trim(experiment_id)//'.nc' 
           output_filename_hr=trim(output_dir)//'SVM_'//trim(sites_name)//'.'//trim(year_str)    &
-                                //'.hr_C2_laigp0_root0.6_meltroll_coupled_snow.nc' 
+                                //'.hr_'//trim(experiment_id)//'.nc'  
 
           write(98, *) "input_climfile= ", input_climfile
           write(98, *) "input_laifile= ", input_laifile
@@ -492,30 +496,33 @@ program SVMC
 
         !********** Read daily input data
         if (mod(tot_hour,24.0) .eq. 0) then
-          print *, "OK0"            
+          ! print *, "OK0"            
           if (obs_snowdepth) then
             call netCDF_readsnow(input_snowdepth, snowdepth_matrix, step_snowdepth)
             snowdepth=snowdepth_matrix(1,1,1)               
             step_snowdepth=step_snowdepth+1
-            print *, "OK1"
+            ! print *, "OK1"
           end if
 
           if (obs_lai) then
             call netCDF_readlai(input_laifile, lai_matrix, step_lai)
-            print *, "OK2"
+            ! print *, "OK2"
             step_lai=step_lai+1
-            if (snowdepth .lt. 0.0005) then
+            ! need to turn off snowdepth control on lai when invert_option=1, 2.
+            !if (snowdepth .lt. 0.0005) then
+              delta_lai=lai_matrix(1,1,1)-lai
               lai=lai_matrix(1,1,1)
-            else
-              lai=0.0
-            end if 
+            !else
+            !  delta_lai=0.0
+            !  lai=0.0
+            !end if 
             ! calculate fapar:
             fapar= 1-exp(-k*lai)
           end if
               
           if (obs_soilmoist) then
             call netCDF_readsoilmoist(input_soilmoist, soilmoist_matrix, step_soilmoist)
-            print *, "OK3"
+            ! print *, "OK3"
             soilmoist=soilmoist_matrix(1,1,1)               
             call soil_water_retention_curve(soilmoist, spafhy_para, psi_soil)
             step_soilmoist=step_soilmoist+1
@@ -526,7 +533,7 @@ program SVMC
             call netCDF_readmanagement(input_manage, manage_data%management_type, & 
                             manage_data%management_c_input, manage_data%management_c_output, & 
                             manage_data%management_n_input, manage_data%management_n_output, step_management)
-            print *, "OK4"
+            ! print *, "OK4"
             step_management=step_management+1
           else
             manage_data%management_type=0
@@ -542,7 +549,7 @@ program SVMC
         call netCDF_readClim(input_climfile, temp_matrix, ppfd_matrix, rg_matrix, prec_matrix, &
                        sh_matrix, rh_matrix, vpd_matrix, pres_matrix, &
                        co2_matrix, wind_matrix, step_clim)
-        print *, "OK5"
+        ! print *, "OK5"
         step_clim=step_clim+1
 
         temp=temp_matrix(1,1,1) ! deg C or K???
@@ -562,7 +569,6 @@ program SVMC
         ! run phydro to estimate photosynthetic rate (a) and stomatal conductance (gs)
         ! At what time scale the optimization should work need to be tested!!!!
         
-        rdark=0.0
         if(.not. obs_soilmoist) then
           !psi_soil = -1.0
           psi_soil = soilwater_state%Psi !root zone, MPa
@@ -589,9 +595,9 @@ program SVMC
                                  psi_soil, rdark,                                                &
                                  jmax, dpsi, gs, aj, ci, chi, vcmax, profit, chi_jmax_lim        &
                                  )
-          
+
         ! HT: need to multiply lai or not? probably not as fapar has considered the effect of lai.
-        gpp= aj * c_molmass * 1e-6 * 1e-3 * lai       ! aj in umol/m2/s, gpp kg C/m2/s multi-layer hypothesis
+        gpp= (aj + rdark*vcmax) * c_molmass * 1e-6 * 1e-3 * lai       ! aj in umol/m2/s, gpp kg C/m2/s multi-layer hypothesis
         !gpp= aj * c_molmass * 1e-6 * 1e-3            ! big leaf hypothesis
         
         if(phydro_debug)then
@@ -669,11 +675,11 @@ program SVMC
           !************************************************************************
           if(step_nc_hr.eq.0)then
             !Initialize netcdf file
-            print *, "ntim_out_hr=", ntim_out_hr
+            !print *, "ntim_out_hr=", ntim_out_hr
             call netCDF_prepareOUTPUT(output_filename_hr, cur_date, 000000, lon_sites, lat_sites, ntim_out_hr)
           end if
 
-          print *, "step_nc_hr=", step_nc_hr
+          ! print *, "step_nc_hr=", step_nc_hr
           call netCDF_writeOUTPUT(output_filename_hr, "GPP", gpp, hour_yr/24.0, step_nc_hr)
           call netCDF_writeOUTPUT(output_filename_hr, "stomatal_conductance", gs, hour_yr/24.0, step_nc_hr)
           call netCDF_writeOUTPUT(output_filename_hr, "Jmax", jmax, hour_yr/24.0, step_nc_hr)
@@ -761,12 +767,19 @@ program SVMC
             metyasso(1), metyasso(2), metyasso_roll(1), metyasso_roll(2)
         end if
 
-        if (ISNAN(gpp) .or. (gpp .lt. 0.0)) then
+        if (ISNAN(aj) .or. (aj .lt. 0.0)) then
           gpp = 0.0
         else 
           num_gpp_day= num_gpp_day+1
         end if
         gpp_day=gpp_day + gpp
+
+        if (ISNAN(vcmax) .or. (vcmax .le. 0.0)) then
+          vcmax=0.0
+        else 
+          num_vcmax_day= num_vcmax_day+1
+        end if
+        vcmax_day=vcmax_day+vcmax
         
         if ((mod(tot_hour+1,24.0) .eq. 0)) then    ! here assume the start time is always the beginning of the day, i.e., 00:00 UTC!
                                                    ! tot_hour+1 is used to make sure 24 timesteps in each day: 0, 1 ...., 23
@@ -780,6 +793,16 @@ program SVMC
           else
             gpp_day = gpp_day/num_gpp_day
           end if
+
+          if (num_vcmax_day .eq. 0) then
+            vcmax_day   = 0.0
+          else
+            vcmax_day= vcmax_day/num_vcmax_day
+          end if
+
+          ! Using the average of vcmax (>0) during the daytime to represent daily average vcmax and maintenance respiration. 
+          ! An alternative: using the average of vcmax (vcmax>=0) during the whole day to represent daily average vcmax and maintenance respiration, rdark will have to be adjusted then.   
+          leaf_rdark_day=rdark * vcmax_day * c_molmass * 1e-6 * 1e-3 * lai
 
           ! run Topmodel
           ! catchment average ground water recharge [m per unit area]
@@ -810,8 +833,10 @@ program SVMC
         
           !call alloc_hypothesis_1(gpp_day, npp_day,  leaf_litter_c, root_litter_c, alloc_para)
           !AutoResp=gpp_day*0.5*3600*24
-          call alloc_hypothesis_2(gpp_day, npp_day, AutoResp, croot, cleaf, cstem, leaf_litter_c, root_litter_c, &
-                                  compost, above_biomass, below_biomass, yield, &
+          call invert_alloc(delta_lai, alloc_para, leaf_rdark_day, temp_day, leaf_litter_c, gpp_day, cleaf, cstem, manage_data)
+
+          call alloc_hypothesis_2(temp_day, gpp_day, npp_day, leaf_rdark_day, AutoResp, croot, cleaf, cstem, & 
+                                  leaf_litter_c, root_litter_c, compost, above_biomass, below_biomass, yield, &
                                   lai_alloc, alloc_para, manage_data, pheno_stage)
           
           leaf_litter_c_year = leaf_litter_c_year + leaf_litter_c
@@ -873,6 +898,7 @@ program SVMC
           call netCDF_writeOUTPUT(output_filename_day, "HeteroResp", HeteroResp, hour_yr/24.0, step_nc_day) 
           call netCDF_writeOUTPUT(output_filename_day, "AutoResp", AutoResp/24/3600, hour_yr/24.0, step_nc_day)         
           call netCDF_writeOUTPUT(output_filename_day, "TotalResp", TotalResp, hour_yr/24.0, step_nc_day) 
+          !call netCDF_writeOUTPUT(output_filename_day, "TotalResp", leaf_rdark_day, hour_yr/24.0, step_nc_day) 
           call netCDF_writeOUTPUT(output_filename_day, "GPP", gpp_day, hour_yr/24.0, step_nc_day)
           call netCDF_writeOUTPUT(output_filename_day, "NEE", nee_day, hour_yr/24.0, step_nc_day)
           call netCDF_writeOUTPUT(output_filename_day, "LAI", lai_alloc, hour_yr/24.0, step_nc_day) 
@@ -882,6 +908,11 @@ program SVMC
           call netCDF_writeOUTPUT(output_filename_day, "soil_carbon_content", sum(soilcn_state%cstate), hour_yr/24.0, step_nc_day) 
           call netCDF_writeOUTPUT(output_filename_day, "temperature_yasso", metyasso_roll(1), hour_yr/24.0, step_nc_day) 
           call netCDF_writeOUTPUT(output_filename_day, "precipitation_yasso", metyasso_roll(2), hour_yr/24.0, step_nc_day) 
+
+          call netCDF_writeOUTPUT(output_filename_day, "Vcmax", leaf_rdark_day, hour_yr/24.0, step_nc_day)
+          call netCDF_writeOUTPUT(output_filename_day, "Jmax", alloc_para%cratio_leaf, hour_yr/24.0, step_nc_day)
+          call netCDF_writeOUTPUT(output_filename_day, "Chi", alloc_para%turnover_cleaf, hour_yr/24.0, step_nc_day)
+          call netCDF_writeOUTPUT(output_filename_day, "Dpsi", delta_lai, hour_yr/24.0, step_nc_day)
 
           step_nc_day= step_nc_day+1
 
@@ -925,6 +956,7 @@ program SVMC
           precip_day=0.0
           melt_day=0.0
           num_gpp_day=0
+          num_vcmax_day=0
         end if
       end do ! pft
     end do  ! site

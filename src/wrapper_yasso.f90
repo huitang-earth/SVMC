@@ -115,8 +115,8 @@ subroutine readsoilyasso_namelist(yasso_para)
   !print *, "param_y20_map= ", param_y20_map
   !print *, "awenh_fineroot= ", awenh_fineroot
   !print *, "awenh_compost= ", awenh_compost
-  print *, "fract_root_input= ", fract_root_input
-  print *, "precip_day= ", precip_day
+  !print *, "fract_root_input= ", fract_root_input
+  !print *, "precip_day= ", precip_day
 
   ! Presetting namelist command
   yasso_para%param_y20_map(1:num_params_y20) = param_y20_map

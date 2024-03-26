@@ -134,7 +134,7 @@ contains
     !print *, str_time
     str_time = 'days since '//adate(1:4)//'-'//adate(5:6)// &
      '-'//adate(7:8)//' '//atime(1:2)//':'//atime(3:4)//':'//atime(5:6)
-    print *, str_time
+    !print *, str_time
 
     call check(NF90_PUT_ATT(nc_id, timevar_id, "units", trim(str_time)))
     call check(NF90_PUT_ATT(nc_id, timevar_id, "standard_name", "time"))

@@ -7,4 +7,5 @@ b=2
 alpha=0.08
 gamma=1
 opt_hypothesis='PM'
+rdark=0.015
 /
