@@ -157,7 +157,9 @@ contains
       integer, intent(in)    :: pheno_stage
 
       ! local
-      real(8) :: litter_cstem ! carbon input with "stem" composition per day
+      real(8) :: litter_cstem                                  ! carbon input with "stem" composition per day
+      real(8) :: gr_resp_leaf, gr_resp_stem, gr_resp_root      ! growth respiration, kg C m-2 s-1 
+
 
       if (pheno_stage .eq. 1) then    ! phenology more critic for cereal, sow, emergence, maturity, flower, grainfill
                                       ! temperature dependence can be good ...
@@ -167,11 +169,21 @@ contains
          !if (manage_data%management_type .eq. 0) then    ! no management, organic fertilizer, potential yields, Nitrogen (?) 
          
          ! Allow maintenance respiration of root to be calculated from root carbon storage, not gpp.
+         gr_resp_leaf=max(0.0, (gpp_day * alloc_para%cratio_leaf - leaf_rdark_day)*3600*24)*0.11
+         gr_resp_stem=max((gpp_day * (1-alloc_para%cratio_leaf-alloc_para%cratio_root) &
+                                  - cstem * (alloc_para%cratio_resp * alloc_para%q10 ** ((temp_day - 20)/10)))*3600*24,0.0)*0.11
+         gr_resp_root=max((gpp_day * alloc_para%cratio_root  &
+                                  - croot * (alloc_para%cratio_resp * alloc_para%q10 ** ((temp_day - 20)/10)))*3600*24,0.0)*0.11
+        
+
          npp_day = (gpp_day - (croot + cstem) * (alloc_para%cratio_resp * alloc_para%q10 ** ((temp_day - 20)/10)) &
                               - leaf_rdark_day )* 3600 * 24
          auto_resp = ((croot + cstem) * (alloc_para%cratio_resp * alloc_para%q10 ** ((temp_day - 20)/10)) &
-                              + leaf_rdark_day )* 3600 * 24
-         
+                              + leaf_rdark_day )* 3600 * 24  &
+                              + gr_resp_leaf &
+                              + gr_resp_stem &
+                              + gr_resp_root
+
          if (alloc_para%invert_option .eq. 0) then
            litter_cleaf=cleaf * alloc_para%turnover_cleaf * alloc_para%q10 ** ((temp_day  - 20)/10)
          end if
@@ -180,14 +192,17 @@ contains
          compost=0.0
          
          if (alloc_para%invert_option .eq. 0) then
-            cleaf   = cleaf + gpp_day * alloc_para%cratio_leaf * 3600 * 24  - litter_cleaf - leaf_rdark_day
+            cleaf   = cleaf + gpp_day * alloc_para%cratio_leaf * 3600 * 24  - litter_cleaf - leaf_rdark_day*3600*24 - gr_resp_leaf
          end if
          
          ! Need to consider if cratio_leaf is too large for invert_option: 1 & 2
-         cstem   = cstem + gpp_day * (1-alloc_para%cratio_leaf-alloc_para%cratio_root) *3600 *24 - litter_cstem &
-                     - cstem * (alloc_para%cratio_resp * alloc_para%q10 ** ((temp_day - 20)/10))
+         cstem   = cstem + gpp_day * (1-alloc_para%cratio_leaf-alloc_para%cratio_root) *3600 *24 &
+                     - cstem * (alloc_para%cratio_resp * alloc_para%q10 ** ((temp_day - 20)/10))*3600*24 &
+                     - litter_cstem &
+                     - gr_resp_stem
          croot   = croot + gpp_day * alloc_para%cratio_root* 3600 * 24 - litter_croot &
-                     - croot * (alloc_para%cratio_resp * alloc_para%q10 ** ((temp_day - 20)/10))
+                     - croot * (alloc_para%cratio_resp * alloc_para%q10 ** ((temp_day - 20)/10))*3600*24 &
+                     - gr_resp_root
          !end if
 
          if (manage_data%management_type .eq. 1) then    ! harvesting,  grass is special....        
@@ -208,6 +223,16 @@ contains
          end if
                                                
          litter_cleaf= litter_cleaf + litter_cstem            ! combine leaf and stem together
+      
+      else if (pheno_stage .eq. 2) then
+         litter_croot=croot
+         litter_cleaf=cleaf
+         litter_cstem=cstem
+         croot=0.0
+         cleaf=0.0
+         cstem=0.0
+         npp_day=0.0
+         auto_resp=0.0
       end if
 
       abovebiomass = (cleaf+cstem)/alloc_para%cratio_biomass   ! dry matter, 
@@ -223,7 +248,7 @@ contains
    end subroutine alloc_hypothesis_2
 
    subroutine invert_alloc(delta_lai, alloc_para, leaf_rdark_day, temp_day, litter_cleaf, gpp_day, cleaf, &
-                            cstem, manage_data)
+                            cstem, manage_data, pheno_stage)
 
    ! This is for deriving allometric parameters: turnover_cleaf, cratio_leaf
 
@@ -236,49 +261,59 @@ contains
       real(8), intent(inout) :: delta_lai    ! leaf area index, allometric     
       type(alloc_para_type), intent(inout) :: alloc_para   ! allometric parameters
       type(management_data_type), intent(inout) :: manage_data   ! allometric parameters
+      integer, intent(in)    :: pheno_stage
 
       ! local
-      real(8) :: delta_cleaf ! change of leaf carbon storage required for 
+      real(8) :: delta_cleaf      ! change of leaf carbon storage required for lai changes.
+      real(8) :: gr_resp_leaf     ! growth respiration of leaf.
 
-      delta_cleaf = delta_lai/alloc_para%sla * alloc_para%cratio_biomass
+      if ( pheno_stage .eq. 1) then
 
-      ! Need to consider the managment here?
-      if (alloc_para%invert_option .eq. 1) then
-        litter_cleaf = cleaf * alloc_para%turnover_cleaf * alloc_para%q10 ** ((temp_day  - 20)/10)
-        if (gpp_day .gt. 0.2e-8) then
-           if (manage_data%management_type .eq. 1) then    ! harvesting,  grass is special....  
-             alloc_para%cratio_leaf = (delta_cleaf + litter_cleaf + leaf_rdark_day  & 
+         delta_cleaf = delta_lai/alloc_para%sla * alloc_para%cratio_biomass
+
+         !HT: Here cratio_leaf is from the previous time step for simplicity.
+         gr_resp_leaf=max(0.0, (gpp_day * alloc_para%cratio_leaf - leaf_rdark_day)*3600*24)*0.11
+
+         ! Need to consider the managment here?
+         if (alloc_para%invert_option .eq. 1) then
+            litter_cleaf = cleaf * alloc_para%turnover_cleaf * alloc_para%q10 ** ((temp_day  - 20)/10)
+            if (gpp_day .gt. 0.2e-8) then
+               if (manage_data%management_type .eq. 1) then    ! harvesting,  grass is special....  
+                  alloc_para%cratio_leaf = (delta_cleaf + litter_cleaf + leaf_rdark_day * 3600*24 + gr_resp_leaf & 
+                          + manage_data%management_c_output*3600*24*cleaf/(cleaf+cstem))/3600/24/gpp_day
+               else if (manage_data%management_type .eq. 3) then    ! grazing
+                  alloc_para%cratio_leaf = (delta_cleaf + litter_cleaf + leaf_rdark_day*3600*24 + gr_resp_leaf & 
                         + manage_data%management_c_output*3600*24*cleaf/(cleaf+cstem))/3600/24/gpp_day
-           else if (manage_data%management_type .eq. 3) then    ! grazing
-             alloc_para%cratio_leaf = (delta_cleaf + litter_cleaf + leaf_rdark_day  & 
-                        + manage_data%management_c_output*3600*24*cleaf/(cleaf+cstem))/3600/24/gpp_day
-           else
-             alloc_para%cratio_leaf = (delta_cleaf + litter_cleaf + leaf_rdark_day)/3600/24/gpp_day
-           end if     
-           alloc_para%cratio_leaf = min(0.9, max(0.1, alloc_para%cratio_leaf))
-           alloc_para%cratio_root = 1-alloc_para%cratio_leaf
-        end if
-        cleaf=cleaf + delta_cleaf
+               else
+                  alloc_para%cratio_leaf = (delta_cleaf + litter_cleaf + leaf_rdark_day*3600*24 + gr_resp_leaf)/3600/24/gpp_day
+               end if           
+               alloc_para%cratio_leaf = min(0.9, max(0.1, alloc_para%cratio_leaf))
+               alloc_para%cratio_root = 1-alloc_para%cratio_leaf
+            end if
+            cleaf=cleaf + delta_cleaf
 
-      else if (alloc_para%invert_option .eq. 2) then
-        if (cleaf .gt. 0.00001) then
-           if (manage_data%management_type .eq. 1) then   ! harvesting,  grass is special.... 
-              alloc_para%turnover_cleaf = (gpp_day * alloc_para%cratio_leaf * 3600 * 24 - delta_cleaf - &
-                        manage_data%management_c_output*3600*24*cleaf/(cleaf+cstem) - leaf_rdark_day)/ &
+         else if (alloc_para%invert_option .eq. 2) then
+            if (cleaf .gt. 0.00001) then
+               if (manage_data%management_type .eq. 1) then   ! harvesting,  grass is special.... 
+                  alloc_para%turnover_cleaf = (gpp_day * alloc_para%cratio_leaf * 3600 * 24 - delta_cleaf - &
+                        manage_data%management_c_output*3600*24*cleaf/(cleaf+cstem) - leaf_rdark_day*3600*24 - gr_resp_leaf)/ &
                            cleaf/(alloc_para%q10 ** ((temp_day  - 20)/10))
-           else if (manage_data%management_type .eq. 3) then    ! grazing
-              alloc_para%turnover_cleaf = (gpp_day * alloc_para%cratio_leaf * 3600 * 24 - delta_cleaf - &
-                        manage_data%management_c_output*3600*24*cleaf/(cleaf+cstem) - leaf_rdark_day)/ &
+               else if (manage_data%management_type .eq. 3) then    ! grazing
+                  alloc_para%turnover_cleaf = (gpp_day * alloc_para%cratio_leaf * 3600 * 24 - delta_cleaf - &
+                        manage_data%management_c_output*3600*24*cleaf/(cleaf+cstem) - leaf_rdark_day*3600*24 - gr_resp_leaf)/ &
                            cleaf/(alloc_para%q10 ** ((temp_day  - 20)/10))
-           else
-             alloc_para%turnover_cleaf = (gpp_day * alloc_para%cratio_leaf * 3600 * 24 - delta_cleaf - leaf_rdark_day)/ &
+               else
+                  alloc_para%turnover_cleaf = (gpp_day * alloc_para%cratio_leaf * 3600 * 24 - delta_cleaf - &
+                         leaf_rdark_day*3600*24 - gr_resp_leaf)/ &
                            cleaf/(alloc_para%q10 ** ((temp_day  - 20)/10))
-           end if
-        else
-           cleaf=0.0
-        end if         
-        litter_cleaf= cleaf * alloc_para%turnover_cleaf * alloc_para%q10 ** ((temp_day  - 20)/10)
-        cleaf=cleaf + delta_cleaf
+               end if
+            else
+               cleaf=0.0
+            end if         
+            litter_cleaf= cleaf * alloc_para%turnover_cleaf * alloc_para%q10 ** ((temp_day  - 20)/10)
+            cleaf=cleaf + delta_cleaf
+         end if
+      
       end if
 
    end subroutine invert_alloc
