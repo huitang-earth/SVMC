@@ -211,6 +211,7 @@ program SVMC
   hour_yr_num=(juldate((year_cur+1)*10000+100+1, 000000)- juldate(start_date_day, start_date_hour))*24
 
   ! Set up days in each month for calculating monthly averaged meteorological data.
+  ! 12.05.2024: need to revise month value if the starting date is not from the beginning of the year!!!
 
   if (isleap(year_cur)) then
     month=(/31,60,91,121,152,182,213,244,274,305,335,366/)
@@ -236,8 +237,8 @@ program SVMC
   ! Here we assume all input files have time stamp starting from the beginning of the year
   ! In rare cases when the starting date of the input file is not the beginnig of the year, we need to manually adjust the date.
   ! e.g., Qvidja 2018: clim forcing file starts from 2018.05.08
-  start_clim_juldate      =juldate(year_cur*10000+500+8,000000)
-  !start_clim_juldate      =juldate(year_cur*10000+100+1,000000)
+  !start_clim_juldate      =juldate(year_cur*10000+500+8,000000)
+  start_clim_juldate      =juldate(year_cur*10000+100+1,000000)
   start_lai_juldate       =juldate(year_cur*10000+100+1,000000)
   start_soilmoist_juldate =juldate(year_cur*10000+100+1,000000)
   start_snowdepth_juldate =juldate(year_cur*10000+100+1,000000)
@@ -483,6 +484,7 @@ program SVMC
           hour_yr=0
           step_nc_hr=0
           step_nc_day=0
+          pheno_stage=1
 
           if ( end_date_day/10000 .gt. year_cur) then
             ntim_out_hr = ((juldate((year_cur+1)*10000+100+1, 000000) - juldate(year_cur*10000+100+1, 000000))*24)/time_step_output
@@ -574,6 +576,18 @@ program SVMC
           psi_soil = soilwater_state%Psi !root zone, MPa
           !psi_soil = min(-eps, max(psi_soil, -3.0))  ! ensures psi_soil <0 and >-3.0 MPa
         end if
+
+        ! Yasso: create average meteorological forcings for yasso
+        ! HT: Currently, we use monthly rolling average for each hour calculation
+        !metphydro(1)=temp-273.15
+        !metphydro(2)=vpd
+
+        ! 30-day moving averaging 
+        ! call average_met(metyasso, metyasso_roll, 24*30, &
+        !                           metyasso_state, metyasso_ind)
+
+        ! Exponential smoothing
+        ! call exponential_smooth_met(metphydro, metphydro_roll, metphydro_ind)
 
         if(phydro_debug)then
           print *, "temp =", temp-273.15                  ! unit should be C
@@ -687,6 +701,7 @@ program SVMC
           call netCDF_writeOUTPUT(output_filename_hr, "Chi", chi, hour_yr/24.0, step_nc_hr)
           call netCDF_writeOUTPUT(output_filename_hr, "Dpsi", dpsi, hour_yr/24.0, step_nc_hr)
           call netCDF_writeOUTPUT(output_filename_hr, "Profit", profit, hour_yr/24.0, step_nc_hr)
+          call netCDF_writeOUTPUT(output_filename_hr, "fPAR", fapar, hour_yr/24.0, step_nc_hr)
 
           !Use common unit [mm s-1] ≈ [kg H2O m-2 s-1] for flux
           call netCDF_writeOUTPUT(output_filename_hr, "Qle", LE, hour_yr/24.0, step_nc_hr)
@@ -747,7 +762,13 @@ program SVMC
 
         ! Yasso: create average meteorological forcings for yasso
         ! HT: Currently, we use monthly rolling average for each hour calculation
-        metyasso(1)=temp-273.15
+        if ((obs_snowdepth) .and. (snowdepth .gt. 0.01)) then
+          metyasso(1)=0.0
+        else
+          metyasso(1)=temp-273.15
+        end if 
+        
+       ! metyasso(1)=temp-273.15
         metyasso(2)=prec+canopywater_flux%Melt/(time_step*3600.0)
       
         ! 30-day moving averaging 
@@ -833,7 +854,14 @@ program SVMC
         
           !call alloc_hypothesis_1(gpp_day, npp_day,  leaf_litter_c, root_litter_c, alloc_para)
           !AutoResp=gpp_day*0.5*3600*24
-          call invert_alloc(delta_lai, alloc_para, leaf_rdark_day, temp_day, leaf_litter_c, gpp_day, cleaf, cstem, manage_data)
+          if (pft_type=="oat") then
+              if ((canopywater_state%swe .gt. 10) .and. (step_nc_day .gt. month(9))) then
+                pheno_stage=2         ! assuming this at this stage, root carbon goes to soil totally. 
+              end if
+          end if
+
+          call invert_alloc(delta_lai, alloc_para, leaf_rdark_day, temp_day, leaf_litter_c, gpp_day, cleaf, cstem, &
+                                 manage_data, pheno_stage)
 
           call alloc_hypothesis_2(temp_day, gpp_day, npp_day, leaf_rdark_day, AutoResp, croot, cleaf, cstem, & 
                                   leaf_litter_c, root_litter_c, compost, above_biomass, below_biomass, yield, &
