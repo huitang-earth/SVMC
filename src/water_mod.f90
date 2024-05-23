@@ -205,7 +205,7 @@ contains
         
     n1 = spafhy_para%n_van 
     !m1 = 1.0/n1
-    m1=1-1.0/n1  
+    m1=1.0-1.0/n1  
     alpha_van = spafhy_para%alpha_van 
     watsat = spafhy_para%watsat  
     watres = spafhy_para%watres
@@ -222,6 +222,8 @@ contains
 
   SUBROUTINE soil_hydraulic_conductivity(vol_liq, spafhy_para, khydr)
   ! Computes soil hydraulic conductivity
+  ! Equation based on : equation [2] in doi:10.2136/vzj2005.0005 
+  !     A Modified Mualem–van Genuchten Formulation for Improved Description of the Hydraulic Conductivity Near Saturation
 
     real(8), intent(in) :: vol_liq        ! v/v, volumetric of liq in soil bucket
     type(spafhy_para_type), intent(in)    :: spafhy_para ! parameters
@@ -235,7 +237,8 @@ contains
     real(8) :: eff_porosity! v/v, volume of ice
 
     n1 = spafhy_para%n_van 
-    m1 = 1-1.0/n1  
+    !m1 = 1.0/n1
+    m1 = 1.0-1.0/n1  
     alpha_van = spafhy_para%alpha_van
 
     watsat = spafhy_para%watsat  

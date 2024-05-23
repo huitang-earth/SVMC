@@ -264,7 +264,7 @@ subroutine readsoilyasso_namelist(yasso_para)
     real, intent(inout) :: met_rolling(:)    ! previous-step meteorological data
     integer, intent(inout) :: met_ind     ! a counter, must be 1 on first call, not changed outside
     ! local variables
-    real           :: alpha_smooth1=0.005, alpha_smooth2=0.0008
+    real           :: alpha_smooth1=0.01, alpha_smooth2=0.0016
 
     if (met_ind < 1 ) then
        print *, 'something wrong with met_ind: ', met_ind
