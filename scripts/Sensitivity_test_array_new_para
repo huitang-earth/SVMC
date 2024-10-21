@@ -1,0 +1,70 @@
+#!/bin/bash
+
+#SBATCH --job-name=svm_array_job
+#SBATCH --output=svm_array_job_out_%A_%a.txt
+#SBATCH --error=svm_array_job_err_%A_%a.txt
+#SBATCH --account=project_2006422
+#SBATCH --partition=fmi
+#SBATCH --time=00:15:00
+#SBATCH --ntasks=1
+#SBATCH --mem-per-cpu=4000
+#SBATCH --array=1-256
+
+# set the input file to process
+#name=$(sed -n ${SLURM_ARRAY_TASK_ID}p /users/tanghui1/SVMC/python/param_values.txt)
+#echo $name 
+#echo ""
+
+  module load geoconda
+  source /projappl/project_2006422/python/venv/bin/activate
+  module load nco
+
+  pre_sen="F"
+  run_case="F"
+  post_proc="F"
+  post_sen="F"
+
+  echo ${SLURM_ARRAY_TASK_ID}
+  let "lineno=SLURM_ARRAY_TASK_ID"
+  echo ${lineno}
+    
+if [ ${run_case} == "T" ]
+then
+  while IFS=" " read -r conduct psi alpha gamma
+  do
+    echo "para1: $conduct"
+    echo "para2: $psi"
+    echo "para3: $alpha"
+    echo "para4: $gamma"
+    echo "expid: $lineno"
+    
+   /users/tanghui1/SVMC/scripts/Single_run.sh $conduct $psi $alpha $gamma morris_av1_$lineno $run_case
+  
+  done < <(tail -n +${lineno} /users/tanghui1/SVMC/python/param_values_m300.txt | head -n 1)
+fi
+
+if [ ${post_proc} == "T" ]
+then
+  
+  conduct=0 
+  psi=0 
+  alpha=0
+  gamma=0
+  #lineno=368
+  
+  /users/tanghui1/SVMC/scripts/Single_run_hauho.C4.sh $conduct $psi $alpha $gamma morris_sens_hauho_C4_60cm_era_satVPD_$lineno $run_case
+
+fi
+
+#------- aggregate all the sensitivity experiments:
+
+cd /projappl/project_2006422/svm_data/output/veg_sensitivty
+ncecat -u expid SVM_hauho_hr_vegsen_morris_sens_*C4*satVPD*.nc SVM_hauho_hr_vegsen.morris.all.C4.era.satVPD_1710.nc
+ncecat -u expid SVM_hauho_day_vegsen_morris_sens_*C4*satVPD*.nc SVM_hauho_day_vegsen.morris.all.C4.era.satVPD_1710.nc
+ncecat -u expid SVM_hauho_hr-day_vegsen_morris_sens_*C4*satVPD*.nc SVM_hauho_hr-day_vegsen.morris.all.C4.era.satVPD_1710.nc
+
+if [ ${post_sen} == "T" ]
+then
+  python /users/tanghui1/SVMC/python/salib_test.py
+
+fi
