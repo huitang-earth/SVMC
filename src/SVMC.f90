@@ -855,9 +855,13 @@ program SVMC
           !call alloc_hypothesis_1(gpp_day, npp_day,  leaf_litter_c, root_litter_c, alloc_para)
           !AutoResp=gpp_day*0.5*3600*24
           if (pft_type=="oat") then
-              if ((canopywater_state%swe .gt. 10) .and. (step_nc_day .gt. month(9))) then
-                pheno_stage=2         ! assuming this at this stage, root carbon goes to soil totally. 
-              end if
+                   
+              !if ((canopywater_state%swe .gt. 10) .and. (step_nc_day .gt. month(9))) then
+              !  pheno_stage=2         ! assuming this at this stage, root carbon goes to soil totally. 
+              !end if
+ 
+              ! Use GDD to inform the starting and ending of grain filling stage?
+               
           end if
 
           call invert_alloc(delta_lai, alloc_para, leaf_rdark_day, temp_day, leaf_litter_c, gpp_day, cleaf, cstem, &
