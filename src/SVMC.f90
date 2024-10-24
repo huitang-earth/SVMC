@@ -251,7 +251,7 @@ program SVMC
   step_snowdepth = floor(start_date-start_snowdepth_juldate)+1  
   step_management = floor(start_date-start_manage_juldate)+1
 
-  input_climfile=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.hr.timeshift.nc'         
+  input_climfile=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.hr.timeshift_era.nc'         
   input_laifile=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.lai.gp.nc'
   input_soilmoist=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.soilmoist.nc' 
   input_manage=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.management.nc'
@@ -405,7 +405,7 @@ program SVMC
             hour_yr_num=365*24
           end if
 
-          input_climfile=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.hr.timeshift.nc'         
+          input_climfile=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.hr.timeshift_era.nc'         
           input_laifile=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.lai.gp.nc'
           input_soilmoist=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.soilmoist.nc' 
           input_manage=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.management.nc'
