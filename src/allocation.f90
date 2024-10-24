@@ -140,6 +140,7 @@ contains
       real(8), intent(in)    :: temp_day     ! temperature (exponentially averaged),  celcius degree
       real(8), intent(in)    :: gpp_day      ! gpp (daily average),  kg C m-2 s-1
       real(8), intent(in)    :: leaf_rdark_day    ! leaf dark respiration (daily average), kg C m-2 s-1
+
       real(8), intent(inout) :: npp_day      ! npp (daily average),  kg C m-2 s-1
       real(8), intent(inout) :: auto_resp      ! npp (daily average),  kg C m-2 s-1
       real(8), intent(inout) :: croot        ! root carbon
@@ -158,6 +159,7 @@ contains
 
       ! local
       real(8) :: litter_cstem                                  ! carbon input with "stem" composition per day
+      real(8) :: cgrain                                        ! grain carbon
       real(8) :: gr_resp_leaf, gr_resp_stem, gr_resp_root      ! growth respiration, kg C m-2 s-1 
 
 
@@ -206,11 +208,29 @@ contains
          !end if
 
          if (manage_data%management_type .eq. 1) then    ! harvesting,  grass is special....        
-            if (alloc_para%invert_option .eq. 0) then
-               cleaf = cleaf - manage_data%management_c_output*3600*24*cleaf/(cleaf+cstem)
+            if (pft_type="grass") then 
+               if (alloc_para%invert_option .eq. 0) then    
+                  cleaf = cleaf - manage_data%management_c_output*3600*24*cleaf/(cleaf+cstem)
+               end if
+               cstem = cstem - manage_data%management_c_output*3600*24*cstem/(cleaf+cstem)
+               ! no litter input to soil for perennial forage grass, the plant parts remain alive.  
+            else if (pft_type="oat") then
+               ! For cereal crop, the harvest yield is for grain carbon pool, which is separated from root (not leaf) in the model.  
+               if (alloc_para%invert_option .eq. 1) then 
+                  ! Need to build grain C pool here.
+                  croot = croot - manage_data%management_c_output*3600*24
+                  ! After harvest, the remaining leaf, stem & root carbon go to litter carbon pools. 
+                  litter_croot=croot
+                  litter_cleaf=cleaf
+                  litter_cstem=cstem
+                  croot=0.0
+                  cleaf=0.0
+                  cstem=0.0
+                  npp_day=0.0
+                  auto_resp=0.0
+               end if
             end if
-            cstem = cstem - manage_data%management_c_output*3600*24*cstem/(cleaf+cstem)
-            ! no litter input to soil
+
          else if (manage_data%management_type .eq. 3) then    ! grazing
             if (alloc_para%invert_option .eq. 0) then
               cleaf = cleaf - manage_data%management_c_output*3600*24*cleaf/(cleaf+cstem)
@@ -225,6 +245,8 @@ contains
          litter_cleaf= litter_cleaf + litter_cstem            ! combine leaf and stem together
       
       else if (pheno_stage .eq. 2) then
+         ! needed only for dynamic LAI?
+         ! Build a grain C pool here.                   
          litter_croot=croot
          litter_cleaf=cleaf
          litter_cstem=cstem
@@ -279,14 +301,27 @@ contains
             litter_cleaf = cleaf * alloc_para%turnover_cleaf * alloc_para%q10 ** ((temp_day  - 20)/10)
             if (gpp_day .gt. 0.2e-8) then
                if (manage_data%management_type .eq. 1) then    ! harvesting,  grass is special....  
-                  alloc_para%cratio_leaf = (delta_cleaf + litter_cleaf + leaf_rdark_day * 3600*24 + gr_resp_leaf & 
+                  if (pft_type="grass") then
+                     alloc_para%cratio_leaf = (delta_cleaf + litter_cleaf + leaf_rdark_day * 3600*24 + gr_resp_leaf & 
                           + manage_data%management_c_output*3600*24*cleaf/(cleaf+cstem))/3600/24/gpp_day
+                  else
+                     alloc_para%cratio_leaf = (delta_cleaf + litter_cleaf + leaf_rdark_day * 3600*24 + gr_resp_leaf &
+                           )/3600/24/gpp_day
+                  end if
+
                else if (manage_data%management_type .eq. 3) then    ! grazing
-                  alloc_para%cratio_leaf = (delta_cleaf + litter_cleaf + leaf_rdark_day*3600*24 + gr_resp_leaf & 
+                  if (pft_type="grass") then
+                     alloc_para%cratio_leaf = (delta_cleaf + litter_cleaf + leaf_rdark_day*3600*24 + gr_resp_leaf & 
                         + manage_data%management_c_output*3600*24*cleaf/(cleaf+cstem))/3600/24/gpp_day
+                  else
+                     alloc_para%cratio_leaf = (delta_cleaf + litter_cleaf + leaf_rdark_day*3600*24 + gr_resp_leaf &  
+                          )/3600/24/gpp_day
+                  end if 
+
                else
                   alloc_para%cratio_leaf = (delta_cleaf + litter_cleaf + leaf_rdark_day*3600*24 + gr_resp_leaf)/3600/24/gpp_day
                end if           
+               
                alloc_para%cratio_leaf = min(0.9, max(0.1, alloc_para%cratio_leaf))
                alloc_para%cratio_root = 1-alloc_para%cratio_leaf
             end if
@@ -295,18 +330,33 @@ contains
          else if (alloc_para%invert_option .eq. 2) then
             if (cleaf .gt. 0.00001) then
                if (manage_data%management_type .eq. 1) then   ! harvesting,  grass is special.... 
-                  alloc_para%turnover_cleaf = (gpp_day * alloc_para%cratio_leaf * 3600 * 24 - delta_cleaf - &
-                        manage_data%management_c_output*3600*24*cleaf/(cleaf+cstem) - leaf_rdark_day*3600*24 - gr_resp_leaf)/ &
-                           cleaf/(alloc_para%q10 ** ((temp_day  - 20)/10))
+                  if (pft_type="grass") then
+                     alloc_para%turnover_cleaf = (gpp_day * alloc_para%cratio_leaf * 3600 * 24 - delta_cleaf - &
+                           manage_data%management_c_output*3600*24*cleaf/(cleaf+cstem) - leaf_rdark_day*3600*24 - gr_resp_leaf)/ &
+                              cleaf/(alloc_para%q10 ** ((temp_day  - 20)/10))
+                  else
+                     alloc_para%turnover_cleaf = (gpp_day * alloc_para%cratio_leaf * 3600 * 24 - delta_cleaf - &
+                           leaf_rdark_day*3600*24 - gr_resp_leaf)/ &
+                              cleaf/(alloc_para%q10 ** ((temp_day  - 20)/10))
+                  end if
+
                else if (manage_data%management_type .eq. 3) then    ! grazing
-                  alloc_para%turnover_cleaf = (gpp_day * alloc_para%cratio_leaf * 3600 * 24 - delta_cleaf - &
+                  if (pft_type="grass") then
+                      alloc_para%turnover_cleaf = (gpp_day * alloc_para%cratio_leaf * 3600 * 24 - delta_cleaf - &
                         manage_data%management_c_output*3600*24*cleaf/(cleaf+cstem) - leaf_rdark_day*3600*24 - gr_resp_leaf)/ &
                            cleaf/(alloc_para%q10 ** ((temp_day  - 20)/10))
+                  else
+                      alloc_para%turnover_cleaf = (gpp_day * alloc_para%cratio_leaf * 3600 * 24 - delta_cleaf - &
+                           leaf_rdark_day*3600*24 - gr_resp_leaf)/ &
+                              cleaf/(alloc_para%q10 ** ((temp_day  - 20)/10))
+                  end if
+
                else
                   alloc_para%turnover_cleaf = (gpp_day * alloc_para%cratio_leaf * 3600 * 24 - delta_cleaf - &
                          leaf_rdark_day*3600*24 - gr_resp_leaf)/ &
                            cleaf/(alloc_para%q10 ** ((temp_day  - 20)/10))
                end if
+
             else
                cleaf=0.0
             end if         
