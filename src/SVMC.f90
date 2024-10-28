@@ -83,9 +83,10 @@ program SVMC
                                 pres_matrix, co2_matrix, gpp_matrix, &
                                 jmax_matrix, vcmax_matrix, dpsi_matrix, &
                                 chi_matrix, profit_matrix, gs_matrix, &
-                                evap_matrix, psi_soil_matrix, soilmoist1_matrix, tmp_matrix
+                                evap_matrix, psi_soil_matrix, soilmoist1_matrix, tmp_matrix, &
+                                grain_fill_matrix1, grain_fill_matrix2
 
-  real(8)     ::    lai=0.0, lai_alloc, delta_lai
+  real(8)     ::    lai=0.0, lai_alloc, delta_lai, grain_fill_1, grain_fill_2
 
   real(8)    :: jmax       !  The maximum rate of RuBP regeneration (umol/m2/s) at growth temperature (argument\code{tc}), calculated using
                                                 ! \deqn{A_J = A_C} 
@@ -117,7 +118,7 @@ program SVMC
   real(8)    :: tmp_input_cf1, tmp_input_cf2, tmp_input_cf3, tmp_input_cf4, tmp_input_cf5
 
   ! alloc variables
-  real(8)    :: croot=0.0, cleaf=0.0, cstem=0.0
+  real(8)    :: croot=0.0, cleaf=0.0, cstem=0.0, cgrain=0.0
   real(8)    :: above_biomass, below_biomass, yield
   integer    :: pheno_stage=1, num_gpp_day=0, num_vcmax_day=0
 
@@ -252,7 +253,7 @@ program SVMC
   step_management = floor(start_date-start_manage_juldate)+1
 
   input_climfile=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.hr.timeshift_era.nc'         
-  input_laifile=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.lai.gp.nc'
+  input_laifile=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.lai.gp.pheno.nc'
   input_soilmoist=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.soilmoist.nc' 
   input_manage=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.management.nc'
   input_snowdepth=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.snowdepth.nc'
@@ -406,7 +407,7 @@ program SVMC
           end if
 
           input_climfile=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.hr.timeshift_era.nc'         
-          input_laifile=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.lai.gp.nc'
+          input_laifile=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.lai.gp.pheno.nc'
           input_soilmoist=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.soilmoist.nc' 
           input_manage=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.management.nc'
           input_snowdepth=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.snowdepth.nc'
@@ -507,13 +508,15 @@ program SVMC
           end if
 
           if (obs_lai) then
-            call netCDF_readlai(input_laifile, lai_matrix, step_lai)
+            call netCDF_readlai(input_laifile, lai_matrix, grain_fill_matrix1, grain_fill_matrix2, step_lai)
             ! print *, "OK2"
             step_lai=step_lai+1
             ! need to turn off snowdepth control on lai when invert_option=1, 2.
             !if (snowdepth .lt. 0.0005) then
               delta_lai=lai_matrix(1,1,1)-lai
               lai=lai_matrix(1,1,1)
+              grain_fill_1=grain_fill_matrix1(1,1,1)/3600/24
+              grain_fill_2=grain_fill_matrix2(1,1,1)/3600/24
             !else
             !  delta_lai=0.0
             !  lai=0.0
@@ -867,9 +870,9 @@ program SVMC
           call invert_alloc(delta_lai, alloc_para, leaf_rdark_day, temp_day, leaf_litter_c, gpp_day, cleaf, cstem, &
                                  manage_data, pheno_stage)
 
-          call alloc_hypothesis_2(temp_day, gpp_day, npp_day, leaf_rdark_day, AutoResp, croot, cleaf, cstem, & 
+          call alloc_hypothesis_2(temp_day, gpp_day, npp_day, leaf_rdark_day, AutoResp, croot, cleaf, cstem, cgrain, & 
                                   leaf_litter_c, root_litter_c, compost, above_biomass, below_biomass, yield, &
-                                  lai_alloc, alloc_para, manage_data, pheno_stage)
+                                  lai_alloc, alloc_para, grain_fill_1, manage_data, pheno_stage)
           
           leaf_litter_c_year = leaf_litter_c_year + leaf_litter_c
           root_litter_c_year = root_litter_c_year + root_litter_c
@@ -934,7 +937,8 @@ program SVMC
           call netCDF_writeOUTPUT(output_filename_day, "GPP", gpp_day, hour_yr/24.0, step_nc_day)
           call netCDF_writeOUTPUT(output_filename_day, "NEE", nee_day, hour_yr/24.0, step_nc_day)
           call netCDF_writeOUTPUT(output_filename_day, "LAI", lai_alloc, hour_yr/24.0, step_nc_day) 
-          call netCDF_writeOUTPUT(output_filename_day, "TotLivBiom", above_biomass + below_biomass, hour_yr/24.0, step_nc_day)
+          !call netCDF_writeOUTPUT(output_filename_day, "TotLivBiom", above_biomass + below_biomass, hour_yr/24.0, step_nc_day)
+          call netCDF_writeOUTPUT(output_filename_day, "TotLivBiom", cgrain, hour_yr/24.0, step_nc_day)
           call netCDF_writeOUTPUT(output_filename_day, "leaf_carbon_content", cleaf, hour_yr/24.0, step_nc_day)  
           call netCDF_writeOUTPUT(output_filename_day, "root_carbon_content", croot, hour_yr/24.0, step_nc_day) 
           call netCDF_writeOUTPUT(output_filename_day, "soil_carbon_content", sum(soilcn_state%cstate), hour_yr/24.0, step_nc_day) 
