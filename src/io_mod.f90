@@ -468,17 +468,19 @@ contains
     
   end subroutine netCDF_readClim 
 
-  subroutine netCDF_readlai(filename, lai, i)
+  subroutine netCDF_readlai(filename, lai, grain_fill_1, grain_fill_2, i)
 
      use netcdf
      implicit none
 
      character(*), intent(in) :: filename
      integer, intent(in)      :: i
-     real(8), dimension(:,:,:), intent (out)       :: lai
+     real(8), dimension(:,:,:), intent (out)       :: lai, grain_fill_1, grain_fill_2
 
      call netCDF_readvar(filename, "LAI", lai, i)
-
+     call netCDF_readvar(filename, "grain_filling_1", grain_fill_1, i)
+     call netCDF_readvar(filename, "grain_filling_2", grain_fill_2, i)
+     
   end subroutine netCDF_readlai
 
   subroutine netCDF_readsoilmoist(filename, soilmoist, i)
