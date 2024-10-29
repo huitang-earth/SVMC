@@ -515,8 +515,13 @@ program SVMC
             !if (snowdepth .lt. 0.0005) then
               delta_lai=lai_matrix(1,1,1)-lai
               lai=lai_matrix(1,1,1)
-              grain_fill_1=grain_fill_matrix1(1,1,1)/3600/24
-              grain_fill_2=grain_fill_matrix2(1,1,1)/3600/24
+              if (pft_type=="oat") then
+                 grain_fill_1=grain_fill_matrix1(1,1,1)/3600/24
+                 grain_fill_2=grain_fill_matrix2(1,1,1)/3600/24
+              else
+                 grain_fill_1=0.0
+                 grain_fill_2=0.0
+              end if     
             !else
             !  delta_lai=0.0
             !  lai=0.0
