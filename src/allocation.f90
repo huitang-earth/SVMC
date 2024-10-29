@@ -179,8 +179,12 @@ contains
                                   - cstem * (alloc_para%cratio_resp * alloc_para%q10 ** ((temp_day - 20)/10)))*3600*24,0.0)*0.11
          gr_resp_root=max((gpp_day * alloc_para%cratio_root - grain_fill  &
                                   - croot * (alloc_para%cratio_resp * alloc_para%q10 ** ((temp_day - 20)/10)))*3600*24,0.0)*0.11
-         gr_resp_grain=max((grain_fill - cgrain*(0.1*alloc_para%cratio_resp * alloc_para%q10 ** ((temp_day - 20)/10)))*3600*24, &
-                              0.0)*0.11        
+         if (pft_type=="oat") then
+            gr_resp_grain=max((grain_fill - cgrain*(0.1*alloc_para%cratio_resp * alloc_para%q10 ** ((temp_day - 20)/10)))*3600*24, &
+                              0.0)*0.11
+         else
+            gr_resp_grain=0.0 
+         end if        
 
          npp_day = (gpp_day - (croot + cstem) * (alloc_para%cratio_resp * alloc_para%q10 ** ((temp_day - 20)/10)) &
                             - cgrain * (0.1 * alloc_para%cratio_resp * alloc_para%q10 ** ((temp_day - 20)/10)) &
@@ -212,10 +216,14 @@ contains
          croot   = croot + (gpp_day * alloc_para%cratio_root - grain_fill) * 3600 * 24 - litter_croot &
                      - croot * (alloc_para%cratio_resp * alloc_para%q10 ** ((temp_day - 20)/10))*3600*24 &
                      - gr_resp_root
-         cgrain  = cgrain + grain_fill*3600*24  &
+         
+         if (pft_type=="oat") then
+             cgrain  = cgrain + grain_fill*3600*24  &
                      - cgrain * (0.1*alloc_para%cratio_resp * alloc_para%q10 ** ((temp_day - 20)/10))*3600*24 &
                      - gr_resp_grain
-         
+         else
+            cgrain=0.0
+         end if
          !end if
 
          if (manage_data%management_type .eq. 1) then    ! harvesting,  grass is special....        
