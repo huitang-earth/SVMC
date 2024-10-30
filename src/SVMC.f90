@@ -865,8 +865,9 @@ program SVMC
           if (pft_type=="oat") then
                    
               !if ((canopywater_state%swe .gt. 10) .and. (step_nc_day .gt. month(9))) then
-              !  pheno_stage=2         ! assuming this at this stage, root carbon goes to soil totally. 
-              !end if
+              if (step_nc_day .eq. month(3)) then
+                pheno_stage=2         ! assuming this at this stage, root carbon goes to soil totally. 
+              end if
  
               ! Use GDD to inform the starting and ending of grain filling stage?
                
@@ -877,7 +878,7 @@ program SVMC
 
           call alloc_hypothesis_2(temp_day, gpp_day, npp_day, leaf_rdark_day, AutoResp, croot, cleaf, cstem, cgrain, & 
                                   leaf_litter_c, root_litter_c, compost, above_biomass, below_biomass, yield, &
-                                  lai_alloc, alloc_para, grain_fill_1, manage_data, pheno_stage)
+                                  lai_alloc, alloc_para, grain_fill_2, manage_data, pheno_stage)
           
           leaf_litter_c_year = leaf_litter_c_year + leaf_litter_c
           root_litter_c_year = root_litter_c_year + root_litter_c

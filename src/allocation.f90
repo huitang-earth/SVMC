@@ -159,7 +159,7 @@ contains
       real(8), intent(inout) :: grain_fill   ! grain-filling C flux, kg C m-2 s-1
       type(alloc_para_type), intent(inout) :: alloc_para   ! allometric parameters
       type(management_data_type), intent(inout) :: manage_data   ! allometric parameters
-      integer, intent(in)    :: pheno_stage
+      integer, intent(inout)    :: pheno_stage
 
       ! local
       real(8) :: litter_cstem                                  ! carbon input with "stem" composition per day
@@ -276,6 +276,9 @@ contains
          cstem=0.0
          npp_day=0.0
          auto_resp=0.0
+         pheno_stage=1  ! Get back to normal phenology after removing all the living biomass,
+                        ! e.g. cover crop. If there is no harvest event for cover crop,
+                        ! they will be moved to litter c pools in the spring of next year. 
       end if
 
       abovebiomass = (cleaf+cstem+cgrain)/alloc_para%cratio_biomass   ! dry matter, 
