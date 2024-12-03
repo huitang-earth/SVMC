@@ -213,9 +213,9 @@ contains
                      - cstem * (alloc_para%cratio_resp * alloc_para%q10 ** ((temp_day - 20)/10))*3600*24 &
                      - litter_cstem &
                      - gr_resp_stem
-         croot   = croot + (gpp_day * alloc_para%cratio_root - grain_fill) * 3600 * 24 - litter_croot &
+         croot   = max(0.0, croot + (gpp_day * alloc_para%cratio_root - grain_fill) * 3600 * 24 - litter_croot &
                      - croot * (alloc_para%cratio_resp * alloc_para%q10 ** ((temp_day - 20)/10))*3600*24 &
-                     - gr_resp_root
+                     - gr_resp_root)
          
          if (pft_type=="oat") then
              cgrain  = cgrain + grain_fill*3600*24  &
@@ -349,7 +349,7 @@ contains
                alloc_para%cratio_leaf = min(0.9, max(0.1, alloc_para%cratio_leaf))
                alloc_para%cratio_root = 1-alloc_para%cratio_leaf
             end if
-            cleaf=cleaf + delta_cleaf
+            cleaf=max(0.0, cleaf + delta_cleaf)
 
          else if (alloc_para%invert_option .eq. 2) then
             if (cleaf .gt. 0.00001) then
@@ -385,7 +385,7 @@ contains
                cleaf=0.0
             end if         
             litter_cleaf= cleaf * alloc_para%turnover_cleaf * alloc_para%q10 ** ((temp_day  - 20)/10)
-            cleaf=cleaf + delta_cleaf
+            cleaf=max(0.0,cleaf + delta_cleaf)
          end if
       
       end if
