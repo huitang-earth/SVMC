@@ -253,7 +253,7 @@ program SVMC
   step_management = floor(start_date-start_manage_juldate)+1
 
   input_climfile=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.hr.timeshift_era.nc'         
-  input_laifile=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.lai.gp.pheno.nc'
+  input_laifile=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.lai.gp.nc'
   input_soilmoist=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.soilmoist.nc' 
   input_manage=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.management.nc'
   input_snowdepth=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.snowdepth.nc'
@@ -361,6 +361,7 @@ program SVMC
   end if
 
   if (phydro_debug) then
+    inquire(file="phydro_debug.txt", exist=exist)
     if (exist) then
       open(998, file ='phydro_debug.txt', status = 'old', action="write")
     else
@@ -407,7 +408,7 @@ program SVMC
           end if
 
           input_climfile=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.hr.timeshift_era.nc'         
-          input_laifile=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.lai.gp.pheno.nc'
+          input_laifile=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.lai.gp.nc'
           input_soilmoist=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.soilmoist.nc' 
           input_manage=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.management.nc'
           input_snowdepth=trim(input_dir)//'FieldObs_'//trim(sites_name)//'.'//trim(year_str)//'.snowdepth.nc'
@@ -517,7 +518,7 @@ program SVMC
               lai=lai_matrix(1,1,1)
               if (pft_type=="oat") then
                  grain_fill_1=grain_fill_matrix1(1,1,1)/3600/24
-                 grain_fill_2=grain_fill_matrix2(1,1,1)/3600/24
+                 grain_fill_2=grain_fill_matrix2(1,1,1)*1.12/3600/24
               else
                  grain_fill_1=0.0
                  grain_fill_2=0.0
@@ -599,7 +600,7 @@ program SVMC
 
         if(phydro_debug)then
           print *, "temp =", temp-273.15                  ! unit should be C
-          print *, "ppfd =", rg*2.1/lai !ppfd*1000000.0/lai          ! umol/m2/s, current unit is wrong
+          print *, "ppfd =", rg*2.1/max(lai,0.001) !ppfd*1000000.0/lai          ! umol/m2/s, current unit is wrong
                                                          ! Averaging light absorption to each unit area of leaf (multi-layer leaf), 
                                                          !     multiply lai when calculating GPP
                                                          ! Alternatively, use total light absorption (one big leaf)
@@ -611,9 +612,9 @@ program SVMC
           !print *, "vol_liq =", vol_liq
           print *, "psi_soil =", psi_soil                ! MPa
         end if
- 
+
         ! for coupling with SpaFHy: psi_soil = soilwater_state%Psi
-        call pmodel_hydraulics_numerical(temp-273.15, rg*2.1/lai, vpd, co2*1000000, pres, fapar, &
+        call pmodel_hydraulics_numerical(temp-273.15, rg*2.1/max(lai,0.001), vpd, co2*1000000, pres, fapar, &
                                  psi_soil, rdark,                                                &
                                  jmax, dpsi, gs, aj, ci, chi, vcmax, profit, chi_jmax_lim        &
                                  )
@@ -623,7 +624,7 @@ program SVMC
         !gpp= aj * c_molmass * 1e-6 * 1e-3            ! big leaf hypothesis
         
         if(phydro_debug)then
-          print *, "gpp=", gpp, aj, c_molmass, lai
+          print *, "gpp=",tot_hour, gpp, aj, rdark, vcmax,  c_molmass, lai
         end if
         ! Carbon allocation: update gpp, npp, ar ....
         ! call carbon_allocation_hr(a,....)          
@@ -796,7 +797,7 @@ program SVMC
             metyasso(1), metyasso(2), metyasso_roll(1), metyasso_roll(2)
         end if
 
-        if (ISNAN(aj) .or. (aj .lt. 0.0)) then
+        if (ISNAN(gpp) .or. (gpp .lt. 0.0)) then
           gpp = 0.0
         else 
           num_gpp_day= num_gpp_day+1
