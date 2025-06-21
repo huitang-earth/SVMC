@@ -170,7 +170,15 @@ program SVMC
   call initialization_spafhy(canopywater_state, soilwater_state, spafhy_para)
   
   ! initialize yasso model: need temperature & precipitation input
-  call wrapper_yasso_initialize_totc(soilcn_state, yasso_para)
+  if (obs_soc) then
+     ! Use prescribed soil carbon state
+     soilcn_state%cstate=yasso_para%awenh_soc
+     soilcn_state%nstate=sum(yasso_para%awenh_soc) * 0.1  
+  else
+    ! Assuming equilibrium state and a legacy carbon fraction
+    call wrapper_yasso_initialize_totc(soilcn_state, yasso_para)
+  end if
+  
   soilcn_state0=soilcn_state
 
   metyasso_ind=1
@@ -863,16 +871,16 @@ program SVMC
         
           !call alloc_hypothesis_1(gpp_day, npp_day,  leaf_litter_c, root_litter_c, alloc_para)
           !AutoResp=gpp_day*0.5*3600*24
-          if (pft_type=="oat") then
+          !if (pft_type=="oat") then
                    
               !if ((canopywater_state%swe .gt. 10) .and. (step_nc_day .gt. month(9))) then
-              if (step_nc_day .eq. month(3)) then
-                pheno_stage=2         ! assuming this at this stage, root carbon goes to soil totally. 
-              end if
+          !    if (step_nc_day .eq. month(3)) then
+          !      pheno_stage=2         ! assuming this at this stage, root carbon goes to soil totally. Mainly used for cover crop!
+          !    end if
  
               ! Use GDD to inform the starting and ending of grain filling stage?
                
-          end if
+          !end if
 
           call invert_alloc(delta_lai, alloc_para, leaf_rdark_day, temp_day, leaf_litter_c, gpp_day, cleaf, cstem, &
                                  manage_data, pheno_stage)
@@ -949,6 +957,9 @@ program SVMC
           call netCDF_writeOUTPUT(output_filename_day, "leaf_carbon_content", cleaf, hour_yr/24.0, step_nc_day)  
           call netCDF_writeOUTPUT(output_filename_day, "root_carbon_content", croot, hour_yr/24.0, step_nc_day) 
           call netCDF_writeOUTPUT(output_filename_day, "soil_carbon_content", sum(soilcn_state%cstate), hour_yr/24.0, step_nc_day) 
+          call netCDF_writeOUTPUT(output_filename_day, "leaf_litter_carbon_flux", leaf_litter_c, hour_yr/24.0, step_nc_day)
+          call netCDF_writeOUTPUT(output_filename_day, "root_litter_carbon_flux", root_litter_c, hour_yr/24.0, step_nc_day)             
+          
           call netCDF_writeOUTPUT(output_filename_day, "temperature_yasso", metyasso_roll(1), hour_yr/24.0, step_nc_day) 
           call netCDF_writeOUTPUT(output_filename_day, "precipitation_yasso", metyasso_roll(2), hour_yr/24.0, step_nc_day) 
 

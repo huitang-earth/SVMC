@@ -39,6 +39,7 @@ module wrapper_yasso
      real(8) :: awenh_leaf(statesize_yasso)
      real(8) :: awenh_soluble(statesize_yasso)
      real(8) :: awenh_compost(statesize_yasso)
+     real(8) :: awenh_soc(statesize_yasso)
 
      real :: flux_leafc_day   ! carbon input with "leaf" composition per day
      real :: flux_rootc_day   ! carbon input with "fineroot" composition per day
@@ -87,6 +88,7 @@ subroutine readsoilyasso_namelist(yasso_para)
   real :: cn_input=50 !
   real :: fract_root_input=0.5 
   real :: fract_legacy_soc=0.0
+  real :: awenh_soc(statesize_yasso)=(/2, 2, 2, 2, 2/)
 
   namelist /soilyasso_namelist/ &
     param_y20_map, &
@@ -97,6 +99,7 @@ subroutine readsoilyasso_namelist(yasso_para)
     awenh_leaf, &
     awenh_soluble, &
     awenh_compost, &
+    awenh_soc, &
     tempr_c, &
     tempr_ampl, &
     precip_day, &
@@ -127,6 +130,7 @@ subroutine readsoilyasso_namelist(yasso_para)
   yasso_para%awenh_leaf     = awenh_leaf
   yasso_para%awenh_soluble = awenh_soluble
   yasso_para%awenh_compost = awenh_compost
+  yasso_para%awenh_soc = awenh_soc
   
   ! parameters for initialization
   yasso_para%tempr_c=tempr_c

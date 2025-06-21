@@ -62,8 +62,12 @@ real, public :: nc_h_max = 0.1 ! N-C ratio of the H pool
 
 ! AWENH composition from Palosuo et al. (2015), for grasses. For now, we'll use the same
 ! composition for both above and below ground inputs. The last values (H) are always 0.
-real, public :: awenh_fineroot(statesize_yasso) = (/0.46, 0.32, 0.04, 0.18, 0.0/)
-real, public :: awenh_leaf(statesize_yasso) = (/0.46, 0.32, 0.04, 0.18, 0.0/)
+! real, public :: awenh_fineroot(statesize_yasso) = (/0.46, 0.32, 0.04, 0.18, 0.0/)
+! real, public :: awenh_leaf(statesize_yasso) = (/0.46, 0.32, 0.04, 0.18, 0.0/)
+! cereal crop:
+real, public :: awenh_fineroot(statesize_yasso) = (/0.71, 0.08, 0.03, 0.18, 0.0/)
+real, public :: awenh_leaf(statesize_yasso) = (/0.71, 0.08, 0.03, 0.18, 0.0/)
+
 ! A soil amendment consisting of soluble carbon (and nitrogen)
 real, public :: awenh_soluble(statesize_yasso) = (/0.0, 1.0, 0.0, 0.0, 0.0/)
 ! From Heikkinen et al 2021, composted horse manure with straw litter

@@ -46,7 +46,8 @@ contains
                smvar_id, smpvar_id, cyvar_id, abvar_id, tbvar_id, lcvar_id, rcvar_id, fpvar_id, &
                namedim_id, jmvar_id, vcvar_id, dpsivar_id, chivar_id, provar_id, tempyasso_id, &
                preyasso_id, cevvar_id, gevvar_id, tfvar_id, civar_id, ulvar_id, pivar_id, rfvar_id, &
-               invar_id, drvar_id, tsivar_id, psvar_id, wsvar_id,wstvar_id, csvar_id, swevar_id
+               invar_id, drvar_id, tsivar_id, psvar_id, wsvar_id,wstvar_id, csvar_id, swevar_id, &
+               llvar_id, rlvar_id
                
     integer :: nx_lon=1, ny_lat=1, ntim
     integer :: yyyy,mm,dd,hh,mi,ss
@@ -83,6 +84,8 @@ contains
     call check(nf90_def_var(nc_id, "LAI", nf90_float, (/londim_id,latdim_id,timedim_id/), laivar_id))
     call check(nf90_def_var(nc_id, "soil_carbon_content", nf90_float, (/londim_id,latdim_id,timedim_id/), scvar_id))    
     call check(nf90_def_var(nc_id, "stomatal_conductance", nf90_float, (/londim_id,latdim_id,timedim_id/), stvar_id)) 
+    call check(nf90_def_var(nc_id, "leaf_litter_carbon_flux", nf90_float, (/londim_id,latdim_id,timedim_id/), llvar_id)) 
+    call check(nf90_def_var(nc_id, "root_litter_carbon_flux", nf90_float, (/londim_id,latdim_id,timedim_id/), rlvar_id)) 
 
     call check(nf90_def_var(nc_id, "Qle", nf90_float, (/londim_id,latdim_id,timedim_id/), qlevar_id))
     call check(nf90_def_var(nc_id, "Evap", nf90_float, (/londim_id,latdim_id,timedim_id/), evvar_id))  
@@ -165,6 +168,12 @@ contains
     call check(NF90_PUT_ATT(nc_id, srvar_id, "units", "kg C m-2 s-1"))
     call check(NF90_PUT_ATT(nc_id, srvar_id, "standard_name", "SoilResp"))
     call check(NF90_PUT_ATT(nc_id, srvar_id, "long_name", "Soil Respiration"))
+    call check(NF90_PUT_ATT(nc_id, llvar_id, "units", "kg C m-2 s-1"))
+    call check(NF90_PUT_ATT(nc_id, llvar_id, "standard_name", "leaf_litter_carbon_flux"))
+    call check(NF90_PUT_ATT(nc_id, llvar_id, "long_name", "Leaf Litter Carbon Flux"))
+    call check(NF90_PUT_ATT(nc_id, rlvar_id, "units", "kg C m-2 s-1"))
+    call check(NF90_PUT_ATT(nc_id, rlvar_id, "standard_name", "root_litter_carbon_flux"))
+    call check(NF90_PUT_ATT(nc_id, rlvar_id, "long_name", "root Litter Carbon Flux"))
 
     call check(NF90_PUT_ATT(nc_id, laivar_id, "units", "m2 m-2"))
     call check(NF90_PUT_ATT(nc_id, laivar_id, "standard_name", "LAI"))
@@ -175,7 +184,7 @@ contains
     call check(NF90_PUT_ATT(nc_id, stvar_id, "units", "mol CO2 m-2 s-1"))     ! Unit not consistent with pecan
     call check(NF90_PUT_ATT(nc_id, stvar_id, "standard_name", "stomatal_conductance"))
     call check(NF90_PUT_ATT(nc_id, stvar_id, "long_name", "Stomatal Conductance"))
-
+    
     call check(NF90_PUT_ATT(nc_id, qlevar_id, "units", "W m-2"))
     call check(NF90_PUT_ATT(nc_id, qlevar_id, "standard_name", "Latent heat flux"))
     call check(NF90_PUT_ATT(nc_id, qlevar_id, "long_name", "Latent heat flux"))
