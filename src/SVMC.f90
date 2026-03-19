@@ -86,7 +86,7 @@ program SVMC
                                 evap_matrix, psi_soil_matrix, soilmoist1_matrix, tmp_matrix, &
                                 grain_fill_matrix1, grain_fill_matrix2
 
-  real(8)     ::    lai=0.0, lai_alloc, delta_lai, grain_fill_1, grain_fill_2
+  real(8)     ::    lai=0.0, lai_alloc=0.0, delta_lai, grain_fill_1, grain_fill_2
 
   real(8)    :: jmax       !  The maximum rate of RuBP regeneration (umol/m2/s) at growth temperature (argument\code{tc}), calculated using
                                                 ! \deqn{A_J = A_C} 
@@ -531,13 +531,13 @@ program SVMC
                  grain_fill_1=0.0
                  grain_fill_2=0.0
               end if     
-            !else
-            !  delta_lai=0.0
-            !  lai=0.0
-            !end if 
-            ! calculate fapar:
-            fapar= 1-exp(-k*lai)
-          end if
+           else
+              delta_lai=0.0
+              lai=lai_alloc
+           end if 
+           ! calculate fapar:
+           fapar= 1-exp(-k*lai)
+          !end if
               
           if (obs_soilmoist) then
             call netCDF_readsoilmoist(input_soilmoist, soilmoist_matrix, step_soilmoist)

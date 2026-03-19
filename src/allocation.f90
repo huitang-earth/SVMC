@@ -205,14 +205,15 @@ contains
          compost=0.0
          
          if (alloc_para%invert_option .eq. 0) then
-            cleaf   = cleaf + gpp_day * alloc_para%cratio_leaf * 3600 * 24  - litter_cleaf - leaf_rdark_day*3600*24 - gr_resp_leaf
+            cleaf   = max(0.001, cleaf + gpp_day * alloc_para%cratio_leaf * 3600 * 24 &  
+                               - litter_cleaf - leaf_rdark_day*3600*24 - gr_resp_leaf)
          end if
          
          ! Need to consider if cratio_leaf is too large for invert_option: 1 & 2
-         cstem   = cstem + gpp_day * (1-alloc_para%cratio_leaf-alloc_para%cratio_root) *3600 *24 &
+         cstem   = max(0.0, cstem + gpp_day * (1-alloc_para%cratio_leaf-alloc_para%cratio_root) *3600 *24 &
                      - cstem * (alloc_para%cratio_resp * alloc_para%q10 ** ((temp_day - 20)/10))*3600*24 &
                      - litter_cstem &
-                     - gr_resp_stem
+                     - gr_resp_stem)
          croot   = max(0.0, croot + (gpp_day * alloc_para%cratio_root - grain_fill) * 3600 * 24 - litter_croot &
                      - croot * (alloc_para%cratio_resp * alloc_para%q10 ** ((temp_day - 20)/10))*3600*24 &
                      - gr_resp_root)
@@ -229,9 +230,12 @@ contains
          if (manage_data%management_type .eq. 1) then    ! harvesting,  grass is special....        
             if (pft_type=="grass") then 
                if (alloc_para%invert_option .eq. 0) then    
-                  cleaf = cleaf - manage_data%management_c_output*3600*24*cleaf/(cleaf+cstem)
+                  cleaf = max(0.001, cleaf - manage_data%management_c_output*3600*24*cleaf/(cleaf+cstem))
                end if
-               cstem = cstem - manage_data%management_c_output*3600*24*cstem/(cleaf+cstem)
+               cstem = max(0.0, cstem - manage_data%management_c_output*3600*24*cstem/(cleaf+cstem))
+               print *, "cstem=", cstem
+               print *, "cleaf=", cleaf
+      
                ! no litter input to soil for perennial forage grass, the plant parts remain alive.  
             else if (pft_type=="oat") then
                ! For cereal crop, the harvest yield is for grain carbon pool, which is separated from root (not leaf) in the model.  
@@ -253,9 +257,9 @@ contains
 
          else if (manage_data%management_type .eq. 3) then    ! grazing
             if (alloc_para%invert_option .eq. 0) then
-              cleaf = cleaf - manage_data%management_c_output*3600*24*cleaf/(cleaf+cstem)
+              cleaf = max(0.001, cleaf - manage_data%management_c_output*3600*24*cleaf/(cleaf+cstem))
             end if
-            cstem = cstem - manage_data%management_c_output*3600*24*cstem/(cleaf+cstem)
+            cstem = max(0.0, cstem - manage_data%management_c_output*3600*24*cstem/(cleaf+cstem))
             ! manure input from animal dung or urine.
             compost= manage_data%management_c_input*3600*24
          else if (manage_data%management_type .eq. 4) then    ! organic materials
