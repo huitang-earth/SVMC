@@ -125,7 +125,6 @@ program SVMC
   ! TabPFN feature collection (daily accumulators)
   real(8)    :: vpd_day=0.0, rg_day=0.0, dpsi_day=0.0, chi_day=0.0, psisoil_day=0.0
   integer    :: num_dpsi_day=0
-  integer :: m
   ! TabPFN online prediction: circular buffer for rolling temperature means
   real(8) :: temp_ring(14)
   integer :: temp_ring_idx, temp_ring_count
@@ -136,7 +135,7 @@ program SVMC
   integer :: organic_seq_today, mowing_seq_today
   ! TabPFN online prediction: cratio read back from Python each day
   real(8) :: cratio_leaf_today, cratio_root_today, dummy_q10, dummy_q90
-  integer :: k  ! loop variable for circular buffer
+  integer :: kring  ! loop variable for circular buffer
   integer    :: i_feat, ios_cratio
   character(len=512) :: tabpfn_cmd
   character(len=20)  :: lat_str
@@ -901,13 +900,13 @@ program SVMC
           temp_ring(temp_ring_idx) = temp_day
           temp_ring_count = min(temp_ring_count + 1, 14)
           temp_7day  = 0.0
-          do k = 0, min(temp_ring_count, 7) - 1
-            temp_7day  = temp_7day  + temp_ring(mod(temp_ring_idx - k - 1 + 14, 14) + 1)
+          do kring = 0, min(temp_ring_count, 7) - 1
+            temp_7day  = temp_7day  + temp_ring(mod(temp_ring_idx - kring - 1 + 14, 14) + 1)
           end do
           temp_7day  = temp_7day  / real(min(temp_ring_count, 7),  8)
           temp_14day = 0.0
-          do k = 0, temp_ring_count - 1
-            temp_14day = temp_14day + temp_ring(mod(temp_ring_idx - k - 1 + 14, 14) + 1)
+          do kring = 0, temp_ring_count - 1
+            temp_14day = temp_14day + temp_ring(mod(temp_ring_idx - kring - 1 + 14, 14) + 1)
           end do
           temp_14day = temp_14day / real(temp_ring_count, 8)
 
