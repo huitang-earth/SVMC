@@ -19,7 +19,9 @@ implicit none
      real(8) :: q10                 ! Q10 temperature coefficient (https://en.wikipedia.org/wiki/Q10_(temperature_coefficient))  
      real(8) :: invert_option       ! 0: no inversion from LAI
                                     ! 1: inversion for cratio_leaf
-                                    ! 2: inversion for turnover_leaf           
+                                    ! 2: inversion for turnover_leaf
+     logical            :: use_tabpfn           ! .true.: override cratio_leaf/root from TabPFN CSV
+     character(len=256) :: tabpfn_cratio_file   ! path to cratio_tabpfn.csv written by tabpfn_alloc.py
 
    end type alloc_para_type
 
@@ -58,6 +60,8 @@ contains
       real(8) :: sla                 ! specific leaf area, 
       real(8) :: q10                 ! Q10 temperature coefficient 
       integer :: invert_option
+      logical :: use_tabpfn
+      character(len=256) :: tabpfn_cratio_file
 
       logical :: old
       integer :: readerror
@@ -73,9 +77,13 @@ contains
        turnover_croot, &
        sla, &
        q10, &
-       invert_option
+       invert_option, &
+       use_tabpfn, &
+       tabpfn_cratio_file
 
       old=.false.
+      use_tabpfn         = .false.
+      tabpfn_cratio_file = './cratio_tabpfn.csv'
 
       ! Default setting of allometric parameters
       cratio_resp    = 0.4
@@ -98,16 +106,18 @@ contains
 
       print *, "invert_option=", invert_option
 
-      alloc_para%cratio_resp    = cratio_resp
-      alloc_para%cratio_leaf    = cratio_leaf
-      alloc_para%cratio_root    = cratio_root 
-      alloc_para%harvest_index  = harvest_index
-      alloc_para%cratio_biomass = cratio_biomass
-      alloc_para%turnover_cleaf = turnover_cleaf 
-      alloc_para%turnover_croot = turnover_croot
-      alloc_para%sla            = sla
-      alloc_para%q10            = q10
-      alloc_para%invert_option  = invert_option
+      alloc_para%cratio_resp        = cratio_resp
+      alloc_para%cratio_leaf        = cratio_leaf
+      alloc_para%cratio_root        = cratio_root
+      alloc_para%harvest_index      = harvest_index
+      alloc_para%cratio_biomass     = cratio_biomass
+      alloc_para%turnover_cleaf     = turnover_cleaf
+      alloc_para%turnover_croot     = turnover_croot
+      alloc_para%sla                = sla
+      alloc_para%q10                = q10
+      alloc_para%invert_option      = invert_option
+      alloc_para%use_tabpfn         = use_tabpfn
+      alloc_para%tabpfn_cratio_file = tabpfn_cratio_file
 
       return
 

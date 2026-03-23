@@ -122,6 +122,25 @@ program SVMC
   real(8)    :: above_biomass, below_biomass, yield
   integer    :: pheno_stage=1, num_gpp_day=0, num_vcmax_day=0
 
+  ! TabPFN feature collection (daily accumulators)
+  real(8)    :: vpd_day=0.0, rg_day=0.0, dpsi_day=0.0, chi_day=0.0, psisoil_day=0.0
+  integer    :: num_dpsi_day=0
+  integer :: m
+  ! TabPFN online prediction: circular buffer for rolling temperature means
+  real(8) :: temp_ring(14)
+  integer :: temp_ring_idx, temp_ring_count
+  real(8) :: temp_7day, temp_14day
+  ! TabPFN online prediction: management sequence counters (days since last event, capped at 14)
+  integer :: harvest_ctr, fertilizer_ctr, grazing_ctr, organic_ctr, mowing_ctr
+  integer :: harvest_seq_today, fertilizer_seq_today, grazing_seq_today
+  integer :: organic_seq_today, mowing_seq_today
+  ! TabPFN online prediction: cratio read back from Python each day
+  real(8) :: cratio_leaf_today, cratio_root_today, dummy_q10, dummy_q90
+  integer :: k  ! loop variable for circular buffer
+  integer    :: i_feat, ios_cratio
+  character(len=512) :: tabpfn_cmd
+  character(len=20)  :: lat_str
+
   ! For soil water retention curve
  ! real(8) :: watsat      ! v/v saturate moisture
   !real(8) :: watres      ! v/v, residual soil moisture for Van Genuchten
@@ -242,6 +261,21 @@ program SVMC
     ntim_out_hr = ((end_date - start_date)*24)/time_step_output
     ntim_out_day= end_date - start_date
   end if
+
+  ! TabPFN online: initialise circular buffer and management counters
+  temp_ring       = 0.0
+  temp_ring_idx   = 0
+  temp_ring_count = 0
+  temp_7day       = 0.0
+  temp_14day      = 0.0
+  ! Start counters at 14 so that seq values are 0 until a real event occurs
+  harvest_ctr     = 14
+  fertilizer_ctr  = 14
+  grazing_ctr     = 14
+  organic_ctr     = 14
+  mowing_ctr      = 14
+  cratio_leaf_today = alloc_para%cratio_leaf   ! fallback = namelist value
+  cratio_root_today = alloc_para%cratio_root
 
   ! Here we assume all input files have time stamp starting from the beginning of the year
   ! In rare cases when the starting date of the input file is not the beginnig of the year, we need to manually adjust the date.
@@ -807,10 +841,20 @@ program SVMC
 
         if (ISNAN(gpp) .or. (gpp .lt. 0.0)) then
           gpp = 0.0
-        else 
+        else
           num_gpp_day= num_gpp_day+1
         end if
         gpp_day=gpp_day + gpp
+
+        ! TabPFN: accumulate hourly values for daily feature computation
+        vpd_day     = vpd_day     + vpd
+        rg_day      = rg_day      + rg
+        psisoil_day = psisoil_day + soilwater_state%Psi
+        if (.not. (ISNAN(dpsi) .or. ISNAN(chi))) then
+          dpsi_day     = dpsi_day     + dpsi
+          chi_day      = chi_day      + chi
+          num_dpsi_day = num_dpsi_day + 1
+        end if
 
         if (ISNAN(vcmax) .or. (vcmax .le. 0.0)) then
           vcmax=0.0
@@ -841,6 +885,130 @@ program SVMC
           ! Using the average of vcmax (>0) during the daytime to represent daily average vcmax and maintenance respiration. 
           ! An alternative: using the average of vcmax (vcmax>=0) during the whole day to represent daily average vcmax and maintenance respiration, rdark will have to be adjusted then.   
           leaf_rdark_day=rdark * vcmax_day * c_molmass * 1e-6 * 1e-3 * lai
+
+          ! TabPFN: compute daily averages and store features
+          vpd_day     = vpd_day     / 24.0
+          rg_day      = rg_day      / 24.0
+          psisoil_day = psisoil_day / 24.0
+          if (num_dpsi_day > 0) then
+            dpsi_day = dpsi_day / num_dpsi_day
+            chi_day  = chi_day  / num_dpsi_day
+          end if
+          i_feat = step_nc_day + 1   ! 1-based day index (used as doy in CSV)
+
+          ! TabPFN online: update 14-element circular buffer for rolling temperature means
+          temp_ring_idx   = mod(temp_ring_idx, 14) + 1
+          temp_ring(temp_ring_idx) = temp_day
+          temp_ring_count = min(temp_ring_count + 1, 14)
+          temp_7day  = 0.0
+          do k = 0, min(temp_ring_count, 7) - 1
+            temp_7day  = temp_7day  + temp_ring(mod(temp_ring_idx - k - 1 + 14, 14) + 1)
+          end do
+          temp_7day  = temp_7day  / real(min(temp_ring_count, 7),  8)
+          temp_14day = 0.0
+          do k = 0, temp_ring_count - 1
+            temp_14day = temp_14day + temp_ring(mod(temp_ring_idx - k - 1 + 14, 14) + 1)
+          end do
+          temp_14day = temp_14day / real(temp_ring_count, 8)
+
+          ! TabPFN online: update management sequence counters
+          ! Counter = 0 on event day, increments each day; seq value = counter+1 for days 1-13
+          if (manage_data%management_type == 1) then
+            harvest_ctr = 0
+          else
+            harvest_ctr = min(harvest_ctr + 1, 14)
+          end if
+          if (harvest_ctr > 0 .and. harvest_ctr <= 13) then
+            harvest_seq_today = harvest_ctr + 1
+          else
+            harvest_seq_today = 0
+          end if
+
+          if (manage_data%management_type == 2) then
+            fertilizer_ctr = 0
+          else
+            fertilizer_ctr = min(fertilizer_ctr + 1, 14)
+          end if
+          if (fertilizer_ctr > 0 .and. fertilizer_ctr <= 13) then
+            fertilizer_seq_today = fertilizer_ctr + 1
+          else
+            fertilizer_seq_today = 0
+          end if
+
+          if (manage_data%management_type == 3) then
+            grazing_ctr = 0
+          else
+            grazing_ctr = min(grazing_ctr + 1, 14)
+          end if
+          if (grazing_ctr > 0 .and. grazing_ctr <= 13) then
+            grazing_seq_today = grazing_ctr + 1
+          else
+            grazing_seq_today = 0
+          end if
+
+          if (manage_data%management_type == 4) then
+            organic_ctr = 0
+          else
+            organic_ctr = min(organic_ctr + 1, 14)
+          end if
+          if (organic_ctr > 0 .and. organic_ctr <= 13) then
+            organic_seq_today = organic_ctr + 1
+          else
+            organic_seq_today = 0
+          end if
+
+          if (manage_data%management_type == 5) then
+            mowing_ctr = 0
+          else
+            mowing_ctr = min(mowing_ctr + 1, 14)
+          end if
+          if (mowing_ctr > 0 .and. mowing_ctr <= 13) then
+            mowing_seq_today = mowing_ctr + 1
+          else
+            mowing_seq_today = 0
+          end if
+
+          ! TabPFN online: write single-row feature CSV and call Python predictor
+          if (alloc_para%use_tabpfn) then
+            open(77, file='tabpfn_features.csv', status='replace', action='write')
+            write(77, '(A)') 'air_temperature,water_vapor_saturation_deficit,'// &
+                             'surface_downwelling_shortwave_flux_in_air,precipitation_flux,'// &
+                             'Dpsi,Chi,SoilMoistPot,GPP,'// &
+                             'air_temperature_7,air_temperature_14,'// &
+                             'management_type,'// &
+                             'harvest_seq,fertilizer_seq,grazing_seq,organic_material_seq,mowing_seq,'// &
+                             'doy,year'
+            write(77, '(10(ES14.6E2,","),6(I0,","),I0,",",I0)') &
+              temp_day, vpd_day, rg_day, precip_day, &
+              dpsi_day, chi_day, psisoil_day, gpp_day, &
+              temp_7day, temp_14day, &
+              manage_data%management_type, &
+              harvest_seq_today, fertilizer_seq_today, grazing_seq_today, &
+              organic_seq_today, mowing_seq_today, &
+              i_feat, year_cur
+            close(77)
+
+            write(lat_str, '(F8.4)') lat_sites
+            tabpfn_cmd = 'python ../python/tabpfn_alloc.py predict_from_csv' // &
+                         ' --input tabpfn_features.csv' // &
+                         ' --model tabpfn_cratio.pkl' // &
+                         ' --output cratio_tabpfn.csv' // &
+                         ' --latitude ' // trim(adjustl(lat_str))
+            call system(tabpfn_cmd)
+
+            ! Read back today's cratio (columns: cratio_leaf_q10, cratio_leaf, cratio_leaf_q90, cratio_root)
+            open(78, file='cratio_tabpfn.csv', status='old', action='read', iostat=ios_cratio)
+            if (ios_cratio == 0) then
+              read(78, *)   ! skip header
+              read(78, *, iostat=ios_cratio) dummy_q10, cratio_leaf_today, dummy_q90, cratio_root_today
+              close(78)
+              if (ios_cratio /= 0) then
+                write(*,*) 'WARNING: could not read cratio from cratio_tabpfn.csv; using fallback'
+              end if
+            else
+              write(*,*) 'WARNING: cratio_tabpfn.csv not found; using fallback cratio'
+            end if
+          end if
 
           ! run Topmodel
           ! catchment average ground water recharge [m per unit area]
@@ -884,6 +1052,12 @@ program SVMC
 
           call invert_alloc(delta_lai, alloc_para, leaf_rdark_day, temp_day, leaf_litter_c, gpp_day, cleaf, cstem, &
                                  manage_data, pheno_stage)
+
+          ! TabPFN online: use cratio predicted by Python for today
+          if (alloc_para%use_tabpfn) then
+            alloc_para%cratio_leaf = cratio_leaf_today
+            alloc_para%cratio_root = cratio_root_today
+          end if
 
           call alloc_hypothesis_2(temp_day, gpp_day, npp_day, leaf_rdark_day, AutoResp, croot, cleaf, cstem, cgrain, & 
                                   leaf_litter_c, root_litter_c, compost, above_biomass, below_biomass, yield, &
@@ -1011,6 +1185,13 @@ program SVMC
           melt_day=0.0
           num_gpp_day=0
           num_vcmax_day=0
+          ! TabPFN: reset daily accumulators
+          vpd_day=0.0
+          rg_day=0.0
+          dpsi_day=0.0
+          chi_day=0.0
+          psisoil_day=0.0
+          num_dpsi_day=0
         end if
       end do ! pft
     end do  ! site
@@ -1022,6 +1203,8 @@ program SVMC
 
   !call write_restart()
 
+  ! TabPFN online: CSV write, Python call, and cratio read-back now happen
+  ! inside the daily loop above. Nothing to do here.
 
 end program SVMC
 
