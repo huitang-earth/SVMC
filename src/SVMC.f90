@@ -991,21 +991,21 @@ program SVMC
             tabpfn_cmd = 'python ../python/tabpfn_alloc.py predict_from_csv' // &
                          ' --input tabpfn_features.csv' // &
                          ' --model tabpfn_cratio.pkl' // &
-                         ' --output cratio_tabpfn.csv' // &
+                         ' --output ' // trim(alloc_para%tabpfn_cratio_file) // &
                          ' --latitude ' // trim(adjustl(lat_str))
             call system(tabpfn_cmd)
 
             ! Read back today's cratio (columns: cratio_leaf_q10, cratio_leaf, cratio_leaf_q90, cratio_root)
-            open(78, file='cratio_tabpfn.csv', status='old', action='read', iostat=ios_cratio)
+            open(78, file=trim(alloc_para%tabpfn_cratio_file), status='old', action='read', iostat=ios_cratio)
             if (ios_cratio == 0) then
               read(78, *)   ! skip header
               read(78, *, iostat=ios_cratio) dummy_q10, cratio_leaf_today, dummy_q90, cratio_root_today
               close(78)
               if (ios_cratio /= 0) then
-                write(*,*) 'WARNING: could not read cratio from cratio_tabpfn.csv; using fallback'
+                write(*,*) 'WARNING: could not read cratio from ' // trim(alloc_para%tabpfn_cratio_file) // '; using fallback'
               end if
             else
-              write(*,*) 'WARNING: cratio_tabpfn.csv not found; using fallback cratio'
+              write(*,*) 'WARNING: ' // trim(alloc_para%tabpfn_cratio_file) // ' not found; using fallback cratio'
             end if
           end if
 
