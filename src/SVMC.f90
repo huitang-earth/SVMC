@@ -988,11 +988,12 @@ program SVMC
             close(77)
 
             write(lat_str, '(F8.4)') lat_sites
-            tabpfn_cmd = 'python ../python/tabpfn_alloc.py predict_from_csv' // &
+            tabpfn_cmd = 'python tabpfn_alloc.py predict_from_csv' // &
                          ' --input tabpfn_features.csv' // &
                          ' --model tabpfn_cratio.pkl' // &
                          ' --output ' // trim(alloc_para%tabpfn_cratio_file) // &
-                         ' --latitude ' // trim(adjustl(lat_str))
+                         ' --latitude ' // trim(adjustl(lat_str)) // &
+                         ' --ts_features'
             call system(tabpfn_cmd)
 
             ! Read back today's cratio (columns: cratio_leaf_q10, cratio_leaf, cratio_leaf_q90, cratio_root)
