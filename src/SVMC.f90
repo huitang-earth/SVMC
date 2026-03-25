@@ -124,6 +124,7 @@ program SVMC
 
   ! TabPFN feature collection (daily accumulators)
   real(8)    :: vpd_day=0.0, rg_day=0.0, dpsi_day=0.0, chi_day=0.0, psisoil_day=0.0
+  real(8)    :: temp_tabpfn=0.0, prec_tabpfn=0.0
   integer    :: num_dpsi_day=0
   ! TabPFN online prediction: circular buffer for rolling temperature means
   real(8) :: temp_ring(14)
@@ -848,6 +849,8 @@ program SVMC
         ! TabPFN: accumulate hourly values for daily feature computation
         vpd_day     = vpd_day     + vpd
         rg_day      = rg_day      + rg
+        temp_tabpfn = temp_tabpfn + temp
+        prec_tabpfn = prec_tabpfn + prec
         psisoil_day = psisoil_day + soilwater_state%Psi
         if (.not. (ISNAN(dpsi) .or. ISNAN(chi))) then
           dpsi_day     = dpsi_day     + dpsi
@@ -888,6 +891,8 @@ program SVMC
           ! TabPFN: compute daily averages and store features
           vpd_day     = vpd_day     / 24.0
           rg_day      = rg_day      / 24.0
+          temp_tabpfn = temp_tabpfn / 24.0
+          prec_tabpfn = prec_tabpfn / 24.0
           psisoil_day = psisoil_day / 24.0
           if (num_dpsi_day > 0) then
             dpsi_day = dpsi_day / num_dpsi_day
@@ -897,7 +902,7 @@ program SVMC
 
           ! TabPFN online: update 14-element circular buffer for rolling temperature means
           temp_ring_idx   = mod(temp_ring_idx, 14) + 1
-          temp_ring(temp_ring_idx) = temp_day
+          temp_ring(temp_ring_idx) = temp_tabpfn
           temp_ring_count = min(temp_ring_count + 1, 14)
           temp_7day  = 0.0
           do kring = 0, min(temp_ring_count, 7) - 1
@@ -978,7 +983,7 @@ program SVMC
                              'harvest_seq,fertilizer_seq,grazing_seq,organic_material_seq,mowing_seq,'// &
                              'doy,year'
             write(77, '(10(ES14.6E2,","),6(I0,","),I0,",",I0)') &
-              temp_day, vpd_day, rg_day, precip_day, &
+              temp_tabpfn, vpd_day, rg_day, prec_tabpfn, &
               dpsi_day, chi_day, psisoil_day, gpp_day, &
               temp_7day, temp_14day, &
               manage_data%management_type, &
@@ -1188,6 +1193,8 @@ program SVMC
           ! TabPFN: reset daily accumulators
           vpd_day=0.0
           rg_day=0.0
+          temp_tabpfn=0.0
+          prec_tabpfn=0.0
           dpsi_day=0.0
           chi_day=0.0
           psisoil_day=0.0
