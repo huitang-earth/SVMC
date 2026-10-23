@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "SPY-C"
+abstract: >-
+  SPY-C is a process-based crop model that couples SpaFHy (canopy and soil
+  water balance), Phydro (plant hydraulics and photosynthesis) and Yasso
+  (soil carbon), together with crop phenology and carbon allocation.
+type: software
+authors:
+  - family-names: "Tang"
+    given-names: "Hui"
+    # orcid: "https://orcid.org/0000-0002-8745-3859"
+    # affiliation: "Finnish Meteorological Institute"
+version: "1.0.0"
+date-released: "2026-10-19"
+doi: "10.5281/zenodo.23468302"
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.23468302"
+    description: "Concept DOI: all versions, always resolves to the latest release"
+  - type: doi
+    value: "10.5281/zenodo.23468303"
+    description: "Version DOI for v1.0.0 (used in Tang et al., Biogeosciences)"
+repository-code: "https://github.com/huitang-earth/SVMC"
+license: MIT
+keywords:
+  - crop model
+  - plant hydraulics
+  - carbon cycle
+  - water cycle
+  - boreal agriculture
